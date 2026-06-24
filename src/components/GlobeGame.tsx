@@ -6,6 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
 import type { GameRun, Round } from '@/lib/game-types'
 import { formatDailyShare } from '@/lib/share'
+import { pickReaction } from '@/lib/reactions'
 
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
@@ -52,6 +53,7 @@ type RoundResult = {
   points: number
   base: number
   multiplier: number
+  reaction: string
 }
 
 /** Serializable per-round result persisted to the browser for the daily lock. */
@@ -249,7 +251,15 @@ export default function GlobeGame({ run }: { run: GameRun }) {
     const s = scoreRound(guess, answer, round.difficulty)
     setResults((prev) => [
       ...prev,
-      { round, guess, distanceKm: s.distanceKm, points: s.points, base: s.base, multiplier: s.multiplier },
+      {
+        round,
+        guess,
+        distanceKm: s.distanceKm,
+        points: s.points,
+        base: s.base,
+        multiplier: s.multiplier,
+        reaction: pickReaction(s.base),
+      },
     ])
     setPhase('revealed')
   }, [guess, round, answer])
@@ -394,6 +404,7 @@ export default function GlobeGame({ run }: { run: GameRun }) {
             <div className="gg-result-dist">
               {Math.round(lastResult.distanceKm).toLocaleString()} km away
             </div>
+            <p className="gg-reaction">{lastResult.reaction}</p>
             {lastResult.round.fact && <p className="gg-fact">{lastResult.round.fact}</p>}
             <button className="gg-btn gg-btn-primary" onClick={next}>
               {index + 1 >= run.rounds.length ? 'See results' : 'Next round'}
