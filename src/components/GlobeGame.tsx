@@ -32,6 +32,10 @@ const SATELLITE_STYLE: StyleSpecification = {
 
 const LINE_SOURCE = 'gg-line'
 
+// Neutral full-globe framing the player starts each round from. Applied after the
+// globe projection is active (the mercator→globe switch otherwise inflates zoom).
+const GLOBE_VIEW: { center: [number, number]; zoom: number } = { center: [0, 20], zoom: 0.9 }
+
 /** A small colored dot marker element for guess/answer. */
 function markerEl(color: string): HTMLDivElement {
   const el = document.createElement('div')
@@ -146,15 +150,19 @@ export default function GlobeGame({ run }: { run: GameRun }) {
       map = new Map({
         container: wrapRef.current,
         style: SATELLITE_STYLE,
-        center: [0, 20],
-        zoom: 1.4,
+        center: GLOBE_VIEW.center,
+        zoom: GLOBE_VIEW.zoom,
         attributionControl: { compact: true },
         maxPitch: 0,
         dragRotate: false,
       })
       mapRef.current = map
       ;(window as unknown as Record<string, unknown>).__mc_map = map
-      map.on('style.load', () => map?.setProjection({ type: 'globe' }))
+      map.on('style.load', () => {
+        map?.setProjection({ type: 'globe' })
+        // Re-apply after the projection switch so the start view is a full globe.
+        map?.jumpTo(GLOBE_VIEW)
+      })
       map.on('load', () => setReady(true))
       map.on('click', (e) => clickRef.current({ lng: e.lngLat.lng, lat: e.lngLat.lat }))
     })
@@ -231,8 +239,8 @@ export default function GlobeGame({ run }: { run: GameRun }) {
         { padding: 120, maxZoom: 5, duration: 900 },
       )
     } else if (phase === 'guessing' && !guess) {
-      // New round: reset to a wide view so the next place must be re-found.
-      map.flyTo({ center: [0, 20], zoom: 1.4, duration: 700 })
+      // New round: reset to the full-globe view so the next place must be re-found.
+      map.flyTo({ ...GLOBE_VIEW, duration: 700 })
     }
   }, [ready, guess, phase, answer])
 
