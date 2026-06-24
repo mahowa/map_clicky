@@ -22,6 +22,13 @@ export default async function HomePage() {
         </div>
         <p className="mc-note">Tap where you think each place is. Closer = more points.</p>
       </div>
+      <p className="mc-credit">
+        Earth imagery ©{' '}
+        <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">
+          Solar System Scope
+        </a>{' '}
+        (CC BY 4.0)
+      </p>
     </div>
   )
 }

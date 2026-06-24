@@ -23,9 +23,10 @@ function useGlobeComponent(): ComponentType<GlobeProps> | null {
   return Comp
 }
 
-// Locally-hosted high-res Blue Marble (5400×2700, public-domain NASA) for sharper
-// zoom than three-globe's stock 2K example texture. Served from /public.
-const EARTH_TEXTURE = '/earth-blue-marble.jpg'
+// Locally-hosted 8K Earth texture (8192×4096) for sharper zoom than three-globe's
+// stock 2K example texture. Served from /public. Imagery © Solar System Scope
+// (solarsystemscope.com), CC BY 4.0 — credited in the UI (see home page).
+const EARTH_TEXTURE = '/earth-8k.jpg'
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
 
