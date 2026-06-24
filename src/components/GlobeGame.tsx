@@ -23,7 +23,9 @@ function useGlobeComponent(): ComponentType<GlobeProps> | null {
   return Comp
 }
 
-const EARTH_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg'
+// Locally-hosted high-res Blue Marble (5400×2700, public-domain NASA) for sharper
+// zoom than three-globe's stock 2K example texture. Served from /public.
+const EARTH_TEXTURE = '/earth-blue-marble.jpg'
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
 
@@ -115,6 +117,29 @@ export default function GlobeGame({ run }: { run: GameRun }) {
     if (typeof window !== 'undefined' && globeRef.current) {
       ;(window as unknown as Record<string, unknown>).__mc_globe = globeRef.current
     }
+  }, [Globe])
+
+  // Maximize Earth-texture sharpness at grazing/zoomed angles via anisotropic
+  // filtering. The texture loads async, so poll briefly until it's available.
+  useEffect(() => {
+    const g = globeRef.current as {
+      globeMaterial?: () => { map?: { anisotropy: number; needsUpdate: boolean } | null } | null
+      renderer?: () => { capabilities?: { getMaxAnisotropy?: () => number } } | null
+    } | null
+    if (!g?.globeMaterial || !g.renderer) return
+    let tries = 0
+    const id = setInterval(() => {
+      tries += 1
+      const map = g.globeMaterial?.()?.map
+      if (map) {
+        map.anisotropy = g.renderer?.()?.capabilities?.getMaxAnisotropy?.() ?? 8
+        map.needsUpdate = true
+        clearInterval(id)
+      } else if (tries > 50) {
+        clearInterval(id)
+      }
+    }, 100)
+    return () => clearInterval(id)
   }, [Globe])
 
   // Responsive sizing.
