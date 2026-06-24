@@ -12,6 +12,21 @@
   height: 100%;
   cursor: crosshair;
 }
+.gg-globe .maplibregl-map {
+  width: 100%;
+  height: 100%;
+}
+
+.gg-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 15px;
+  pointer-events: none;
+}
 
 .gg-hud {
   position: absolute;

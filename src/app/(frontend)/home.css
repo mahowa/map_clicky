@@ -65,17 +65,3 @@
   color: #64748b;
 }
 
-.mc-credit {
-  position: absolute;
-  bottom: 12px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  margin: 0;
-  font-size: 11px;
-  color: #475569;
-}
-
-.mc-credit a {
-  color: #64748b;
-}

@@ -1,34 +1,43 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Map as MlMap, Marker as MlMarker, StyleSpecification } from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
 import type { GameRun, Round } from '@/lib/game-types'
 import { formatDailyShare } from '@/lib/share'
 
-// react-globe.gl touches window/WebGL — import it manually on the client only,
-// after mount, so it never executes during SSR.
-type GlobeProps = Record<string, unknown>
-
-function useGlobeComponent(): ComponentType<GlobeProps> | null {
-  const [Comp, setComp] = useState<ComponentType<GlobeProps> | null>(null)
-  useEffect(() => {
-    let active = true
-    import('react-globe.gl').then((m) => {
-      if (active) setComp(() => m.default as unknown as ComponentType<GlobeProps>)
-    })
-    return () => {
-      active = false
-    }
-  }, [])
-  return Comp
-}
-
-// Locally-hosted 8K Earth texture (8192×4096) for sharper zoom than three-globe's
-// stock 2K example texture. Served from /public. Imagery © Solar System Scope
-// (solarsystemscope.com), CC BY 4.0 — credited in the UI (see home page).
-const EARTH_TEXTURE = '/earth-8k.jpg'
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
+
+// ESRI World Imagery: free, key-less, label-free satellite tiles with deep zoom
+// (sub-meter to ~z19). No place names → fair guessing. Attribution is required
+// and shown via MapLibre's attribution control.
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    satellite: {
+      type: 'raster',
+      tiles: [
+        'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution:
+        'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    },
+  },
+  layers: [{ id: 'satellite', type: 'raster', source: 'satellite' }],
+}
+
+const LINE_SOURCE = 'gg-line'
+
+/** A small colored dot marker element for guess/answer. */
+function markerEl(color: string): HTMLDivElement {
+  const el = document.createElement('div')
+  el.style.cssText = `width:16px;height:16px;border-radius:999px;background:${color};border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.45);`
+  return el
+}
 
 type Phase = 'guessing' | 'revealed' | 'done'
 
@@ -40,8 +49,6 @@ type RoundResult = {
   base: number
   multiplier: number
 }
-
-type PointDatum = LatLng & { color: string; label: string; size: number }
 
 /** Serializable per-round result persisted to the browser for the daily lock. */
 type SavedRound = {
@@ -89,15 +96,16 @@ export default function GlobeGame({ run }: { run: GameRun }) {
   const [phase, setPhase] = useState<Phase>('guessing')
   const [guess, setGuess] = useState<LatLng | null>(null)
   const [results, setResults] = useState<RoundResult[]>([])
-  const [size, setSize] = useState({ w: 800, h: 600 })
+  const [ready, setReady] = useState(false)
   // Daily lock: result loaded from / saved to the browser, and whether it was a prior day's play.
   const [saved, setSaved] = useState<SavedDaily | null>(null)
   const [playedEarlier, setPlayedEarlier] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const wrapRef = useRef<HTMLDivElement>(null)
-  const globeRef = useRef<unknown>(null)
-  const Globe = useGlobeComponent()
+  const mapRef = useRef<MlMap | null>(null)
+  const markersRef = useRef<MlMarker[]>([])
+  const clickRef = useRef<(p: { lng: number; lat: number }) => void>(() => {})
 
   // On mount, if today's daily was already played in this browser, jump to results.
   useEffect(() => {
@@ -111,48 +119,10 @@ export default function GlobeGame({ run }: { run: GameRun }) {
   }, [run.mode, run.dateKey])
 
   const round = run.rounds[index]
-  const answer: LatLng | null = round ? { lat: round.lat, lng: round.lng } : null
-
-  // Expose the globe instance for e2e/testing (harmless dev affordance).
-  useEffect(() => {
-    if (typeof window !== 'undefined' && globeRef.current) {
-      ;(window as unknown as Record<string, unknown>).__mc_globe = globeRef.current
-    }
-  }, [Globe])
-
-  // Maximize Earth-texture sharpness at grazing/zoomed angles via anisotropic
-  // filtering. The texture loads async, so poll briefly until it's available.
-  useEffect(() => {
-    const g = globeRef.current as {
-      globeMaterial?: () => { map?: { anisotropy: number; needsUpdate: boolean } | null } | null
-      renderer?: () => { capabilities?: { getMaxAnisotropy?: () => number } } | null
-    } | null
-    if (!g?.globeMaterial || !g.renderer) return
-    let tries = 0
-    const id = setInterval(() => {
-      tries += 1
-      const map = g.globeMaterial?.()?.map
-      if (map) {
-        map.anisotropy = g.renderer?.()?.capabilities?.getMaxAnisotropy?.() ?? 8
-        map.needsUpdate = true
-        clearInterval(id)
-      } else if (tries > 50) {
-        clearInterval(id)
-      }
-    }, 100)
-    return () => clearInterval(id)
-  }, [Globe])
-
-  // Responsive sizing.
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight })
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+  const answer: LatLng | null = useMemo(
+    () => (round ? { lat: round.lat, lng: round.lng } : null),
+    [round],
+  )
 
   const handleGlobeClick = useCallback(
     ({ lat, lng }: { lat: number; lng: number }) => {
@@ -161,6 +131,110 @@ export default function GlobeGame({ run }: { run: GameRun }) {
     },
     [phase],
   )
+  // Keep the map's click handler pointing at the latest closure (avoids stale phase).
+  useEffect(() => {
+    clickRef.current = handleGlobeClick
+  }, [handleGlobeClick])
+
+  // Initialize the MapLibre globe once. Dynamic import keeps WebGL/window off SSR.
+  useEffect(() => {
+    if (!wrapRef.current) return
+    let map: MlMap | null = null
+    let cancelled = false
+    import('maplibre-gl').then(({ Map }) => {
+      if (cancelled || !wrapRef.current) return
+      map = new Map({
+        container: wrapRef.current,
+        style: SATELLITE_STYLE,
+        center: [0, 20],
+        zoom: 1.4,
+        attributionControl: { compact: true },
+        maxPitch: 0,
+        dragRotate: false,
+      })
+      mapRef.current = map
+      ;(window as unknown as Record<string, unknown>).__mc_map = map
+      map.on('style.load', () => map?.setProjection({ type: 'globe' }))
+      map.on('load', () => setReady(true))
+      map.on('click', (e) => clickRef.current({ lng: e.lngLat.lng, lat: e.lngLat.lat }))
+    })
+    const el = wrapRef.current
+    const ro = new ResizeObserver(() => mapRef.current?.resize())
+    ro.observe(el)
+    return () => {
+      cancelled = true
+      ro.disconnect()
+      map?.remove()
+      mapRef.current = null
+    }
+  }, [])
+
+  // Draw guess/answer markers + the connecting line, and frame the camera.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+
+    markersRef.current.forEach((m) => m.remove())
+    markersRef.current = []
+    const add = (p: LatLng, color: string) => {
+      import('maplibre-gl').then(({ Marker }) => {
+        if (!mapRef.current) return
+        const mk = new Marker({ element: markerEl(color), anchor: 'center' })
+          .setLngLat([p.lng, p.lat])
+          .addTo(map)
+        markersRef.current.push(mk)
+      })
+    }
+    if (guess) add(guess, GUESS_COLOR)
+    if (phase === 'revealed' && answer) add(answer, ANSWER_COLOR)
+
+    const showLine = phase === 'revealed' && guess && answer
+    const data = {
+      type: 'FeatureCollection' as const,
+      features: showLine
+        ? [
+            {
+              type: 'Feature' as const,
+              properties: {},
+              geometry: {
+                type: 'LineString' as const,
+                coordinates: [
+                  [guess.lng, guess.lat],
+                  [answer.lng, answer.lat],
+                ],
+              },
+            },
+          ]
+        : [],
+    }
+    const src = map.getSource(LINE_SOURCE) as { setData?: (d: unknown) => void } | undefined
+    if (src?.setData) {
+      src.setData(data)
+    } else {
+      map.addSource(LINE_SOURCE, { type: 'geojson', data })
+      map.addLayer({
+        id: LINE_SOURCE,
+        type: 'line',
+        source: LINE_SOURCE,
+        paint: { 'line-color': GUESS_COLOR, 'line-width': 2, 'line-dasharray': [2, 1.5] },
+      })
+    }
+
+    if (showLine && guess && answer) {
+      const lons = [guess.lng, answer.lng]
+      const lats = [guess.lat, answer.lat]
+      map.fitBounds(
+        [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        ],
+        { padding: 120, maxZoom: 5, duration: 900 },
+      )
+    } else if (phase === 'guessing' && !guess) {
+      // New round: reset to a wide view so the next place must be re-found.
+      map.flyTo({ center: [0, 20], zoom: 1.4, duration: 700 })
+    }
+  }, [ready, guess, phase, answer])
 
   const submitGuess = useCallback(() => {
     if (!guess || !round || !answer) return
@@ -204,28 +278,6 @@ export default function GlobeGame({ run }: { run: GameRun }) {
 
   const total = results.reduce((sum, r) => sum + r.points, 0)
   const lastResult = results[results.length - 1]
-
-  // Markers on the globe.
-  const points: PointDatum[] = useMemo(() => {
-    const pts: PointDatum[] = []
-    if (guess) pts.push({ ...guess, color: GUESS_COLOR, label: 'Your guess', size: 0.6 })
-    if (phase === 'revealed' && answer)
-      pts.push({ ...answer, color: ANSWER_COLOR, label: round?.name ?? 'Answer', size: 0.8 })
-    return pts
-  }, [guess, phase, answer, round])
-
-  const arcs = useMemo(() => {
-    if (phase === 'revealed' && guess && answer)
-      return [
-        {
-          startLat: guess.lat,
-          startLng: guess.lng,
-          endLat: answer.lat,
-          endLng: answer.lng,
-        },
-      ]
-    return []
-  }, [phase, guess, answer])
 
   if (phase === 'done') {
     const maxPossible = run.rounds.reduce(
@@ -292,31 +344,7 @@ export default function GlobeGame({ run }: { run: GameRun }) {
   return (
     <div className="gg-root">
       <div className="gg-globe" ref={wrapRef}>
-        {Globe ? (
-          <Globe
-            ref={globeRef}
-            width={size.w}
-            height={size.h}
-            globeImageUrl={EARTH_TEXTURE}
-            backgroundColor="rgba(0,0,0,0)"
-            onGlobeClick={handleGlobeClick}
-            pointsData={points}
-            pointLat={(d: object) => (d as PointDatum).lat}
-            pointLng={(d: object) => (d as PointDatum).lng}
-            pointColor={(d: object) => (d as PointDatum).color}
-            pointAltitude={0.02}
-            pointRadius={(d: object) => (d as PointDatum).size}
-            pointLabel={(d: object) => (d as PointDatum).label}
-            arcsData={arcs}
-            arcColor={() => [GUESS_COLOR, ANSWER_COLOR]}
-            arcStroke={0.6}
-            arcDashLength={0.4}
-            arcDashGap={0.15}
-            arcDashAnimateTime={1500}
-          />
-        ) : (
-          <div className="gg-loading">Loading globe…</div>
-        )}
+        {!ready && <div className="gg-loading">Loading globe…</div>}
       </div>
 
       <div className="gg-hud">
