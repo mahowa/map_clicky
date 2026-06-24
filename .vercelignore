@@ -1,0 +1,6 @@
+# Never upload local env files to the build — Vercel injects project env vars.
+.env
+.env*.local
+
+# Regenerated on the build host via postinstall (`prisma generate`).
+generated

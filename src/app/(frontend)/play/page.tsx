@@ -12,9 +12,7 @@ export default async function PlayPage() {
     return (
       <div className="gg-empty">
         <h1>No locations yet</h1>
-        <p>
-          Add some in the <a href="/admin">admin panel</a> or run <code>pnpm exec tsx scripts/seed.ts</code>.
-        </p>
+        <p>Today&apos;s puzzle isn&apos;t ready yet — check back soon.</p>
       </div>
     )
   }
