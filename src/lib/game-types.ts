@@ -1,0 +1,28 @@
+import type { Difficulty } from './scoring'
+
+/** A single playable round: a place to find on the globe. */
+export type Round = {
+  name: string
+  country: string | null
+  lat: number
+  lng: number
+  difficulty: Difficulty
+  fact: string | null
+}
+
+/** A daily-set round row as stored, carrying the optional history blurb. */
+export type DailyRoundInput = {
+  difficulty?: Difficulty
+  /** "On this day" event that selected the place; preferred over the location's facts. */
+  event?: string | null
+}
+
+/** A full playable run (e.g. the daily 5). */
+export type GameRun = {
+  title: string
+  rounds: Round[]
+  /** 'daily' runs lock after one play (saved in the browser); 'practice' replays freely. */
+  mode: 'daily' | 'practice'
+  /** UTC day key (YYYY-MM-DD) for the daily; '' for practice. Used as the localStorage key. */
+  dateKey: string
+}
