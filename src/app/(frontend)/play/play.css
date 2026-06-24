@@ -217,6 +217,14 @@
   color: #64748b;
   font-weight: 700;
 }
+.gg-verdict {
+  margin: 6px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  font-style: italic;
+  color: #e2e8f0;
+  max-width: 420px;
+}
 .gg-summary {
   list-style: none;
   padding: 0;

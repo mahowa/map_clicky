@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pickReaction } from '@/lib/reactions'
+import { pickReaction, pickVerdict } from '@/lib/reactions'
 
 describe('pickReaction', () => {
   it('returns a non-empty string across the whole score range', () => {
@@ -26,6 +26,27 @@ describe('pickReaction', () => {
     // rng→0.999 must not index past the end of any tier.
     for (const base of [0, 29, 30, 49, 50, 69, 70, 84, 85, 94, 95]) {
       expect(pickReaction(base, () => 0.999)).toBeTruthy()
+    }
+  })
+})
+
+describe('pickVerdict', () => {
+  it('returns a non-empty verdict across the whole percent range', () => {
+    for (const pct of [0, 10, 25, 45, 65, 80, 95, 100]) {
+      const v = pickVerdict(pct, () => 0.5)
+      expect(typeof v).toBe('string')
+      expect(v.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('praises a near-perfect run and roasts a disastrous one', () => {
+    expect(pickVerdict(100, () => 0)).toMatch(/wizard/i)
+    expect(pickVerdict(3, () => 0)).toMatch(/catastrophic/i)
+  })
+
+  it('never indexes past a tier at any boundary', () => {
+    for (const pct of [0, 14, 15, 34, 35, 54, 55, 74, 75, 89, 90, 100]) {
+      expect(pickVerdict(pct, () => 0.999)).toBeTruthy()
     }
   })
 })

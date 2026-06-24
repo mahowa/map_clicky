@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
 import type { GameRun, Round } from '@/lib/game-types'
 import { formatDailyShare } from '@/lib/share'
-import { pickReaction } from '@/lib/reactions'
+import { pickReaction, pickVerdict } from '@/lib/reactions'
 
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
@@ -297,14 +297,21 @@ export default function GlobeGame({ run }: { run: GameRun }) {
   const total = results.reduce((sum, r) => sum + r.points, 0)
   const lastResult = results[results.length - 1]
 
+  const maxPossible = run.rounds.reduce(
+    (s, r) => s + 100 * DIFFICULTY_MULTIPLIER[r.difficulty],
+    0,
+  )
+  // Final total + a one-line verdict, computed once per (stable) score so it
+  // doesn't reshuffle on every results-screen re-render (e.g. the Share button).
+  const finalTotal = saved ? saved.total : total
+  const verdict = useMemo(
+    () => pickVerdict(maxPossible ? Math.round((finalTotal / maxPossible) * 100) : 0),
+    [finalTotal, maxPossible],
+  )
+
   if (phase === 'done') {
-    const maxPossible = run.rounds.reduce(
-      (s, r) => s + 100 * DIFFICULTY_MULTIPLIER[r.difficulty],
-      0,
-    )
     // Render from saved data when present (prior play), else from the live run.
     const summary: SavedRound[] = saved ? saved.rounds : results.map(toSavedRound)
-    const finalTotal = saved ? saved.total : total
     const isDaily = run.mode === 'daily'
     const shareText = formatDailyShare(
       run.dateKey,
@@ -329,6 +336,7 @@ export default function GlobeGame({ run }: { run: GameRun }) {
           {finalTotal}
           <span className="gg-outof"> / {maxPossible}</span>
         </p>
+        <p className="gg-verdict">{verdict}</p>
         <ul className="gg-summary">
           {summary.map((r, i) => (
             <li key={i}>

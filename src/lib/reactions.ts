@@ -93,3 +93,73 @@ export function pickReaction(base: number, rng: () => number = Math.random): str
   const tier = TIERS.find((t) => base >= t.min) ?? TIERS[TIERS.length - 1]
   return tier.quips[Math.floor(rng() * tier.quips.length)] ?? tier.quips[0]
 }
+
+// Overall-run verdicts, keyed by percent of the max possible score (0–100).
+const VERDICT_TIERS: Tier[] = [
+  {
+    min: 90,
+    quips: [
+      'Geography wizard. The globe bows to you.',
+      'Cartographers want your autograph.',
+      'Are you a satellite? Be honest.',
+      'Flawless run. Touch some (correct) grass.',
+      'You have the whole planet memorized, don’t you?',
+    ],
+  },
+  {
+    min: 75,
+    quips: [
+      'Seriously impressive. The atlas is proud.',
+      'Sharp eye. Most of those were dead on.',
+      'You clearly travel — at least on maps.',
+      'Strong run. Gold star, slightly tarnished.',
+      'The globe respects you.',
+    ],
+  },
+  {
+    min: 55,
+    quips: [
+      'Solid showing. Right continents, mostly.',
+      'Not bad — you know your way around.',
+      'Respectable. A few wobbles, no disasters.',
+      'You passed geography. Barely thrived.',
+      'Above average, planet-finder.',
+    ],
+  },
+  {
+    min: 35,
+    quips: [
+      'Middling. The map and you have trust issues.',
+      'You were in the building, not the room.',
+      'Some hits, some... hemispheres.',
+      'C+. See me after class.',
+      'The equator is a suggestion to you, isn’t it?',
+    ],
+  },
+  {
+    min: 15,
+    quips: [
+      'Rough day at the office. The office being Earth.',
+      'A passport wouldn’t have helped here.',
+      'You and the globe are barely on speaking terms.',
+      'The atlas filed a complaint.',
+      'Bold guesses. Wildly wrong, but bold.',
+    ],
+  },
+  {
+    min: 0,
+    quips: [
+      'Catastrophic. Did you play blindfolded?',
+      'A dart-throwing monkey wants a rematch.',
+      'You found a way to miss the whole planet.',
+      'GPS has been revoked. For everyone’s safety.',
+      'That was a geography crime scene.',
+    ],
+  },
+]
+
+/** Pick an overall verdict for a run, given its percent of the max score (0–100). */
+export function pickVerdict(percent: number, rng: () => number = Math.random): string {
+  const tier = VERDICT_TIERS.find((t) => percent >= t.min) ?? VERDICT_TIERS[VERDICT_TIERS.length - 1]
+  return tier.quips[Math.floor(rng() * tier.quips.length)] ?? tier.quips[0]
+}
