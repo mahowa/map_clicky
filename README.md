@@ -2,6 +2,14 @@
 
 This template comes configured with the bare minimum to get started on anything you need.
 
+## Documentation
+
+- **[Daily POI wiki](docs/daily-poi/README.md)** — how each day's five points of interest
+  are sourced (GeoNames + Wikipedia "On this day") and deterministically selected.
+
+> 📝 When you change how the game works, update the docs in the same change — see the
+> maintenance note at the top of the wiki home page.
+
 ## Quick start
 
 This template can be deployed directly from our Cloud hosting and it will setup MongoDB and cloud S3 object storage for media.

@@ -340,12 +340,17 @@ export default function GlobeGame({ run }: { run: GameRun }) {
         <ul className="gg-summary">
           {summary.map((r, i) => (
             <li key={i}>
-              <span className="gg-city">{r.name}</span>
-              <span className="gg-dist">{Math.round(r.distanceKm).toLocaleString()} km</span>
-              <span className="gg-base">
-                {r.base}/100 ×{r.multiplier}
-              </span>
-              <span className="gg-pts">+{r.points}</span>
+              <div className="gg-summary-row">
+                <span className="gg-city">{r.name}</span>
+                <span className="gg-dist">{Math.round(r.distanceKm).toLocaleString()} km</span>
+                <span className="gg-base">
+                  {r.base}/100 ×{r.multiplier}
+                </span>
+                <span className="gg-pts">+{r.points}</span>
+              </div>
+              {run.rounds[i]?.fact && (
+                <p className="gg-summary-fact">{run.rounds[i].fact}</p>
+              )}
             </li>
           ))}
         </ul>

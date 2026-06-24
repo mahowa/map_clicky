@@ -200,6 +200,14 @@
   background: radial-gradient(circle at 50% 30%, #0b1224 0%, #05070f 70%, #000 100%);
   color: #e2e8f0;
   text-align: center;
+  overflow-y: auto;
+}
+/* When the content (5 history blurbs) is taller than the viewport, scroll from
+   the top instead of clipping the centered column. */
+@media (max-height: 760px) {
+  .gg-done {
+    justify-content: flex-start;
+  }
 }
 .gg-done h1 {
   margin: 0;
@@ -229,15 +237,24 @@
   list-style: none;
   padding: 0;
   margin: 8px 0 8px;
-  width: min(420px, 100%);
+  width: min(520px, 100%);
+  text-align: left;
 }
 .gg-summary li {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+.gg-summary-row {
   display: grid;
   grid-template-columns: 1fr auto auto auto;
   gap: 12px;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   align-items: center;
+}
+.gg-summary-fact {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #94a3b8;
 }
 .gg-base {
   color: #64748b;
