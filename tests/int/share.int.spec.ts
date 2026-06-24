@@ -29,6 +29,8 @@ describe('scoreEmoji', () => {
 describe('formatDailyShare', () => {
   it('badges each round by its score, best to worst', () => {
     const text = formatDailyShare('2026-06-23', [100, 88, 72, 55, 1], 316)
-    expect(text).toBe('June 23\n100🎯 88🏅 72🏆 55🎓 1📍\nFinal score: 316')
+    expect(text).toBe(
+      'MapClippy — June 23\n100🎯 88🏅 72🏆 55🎓 1📍\nFinal score: 316\nhttps://map-clicky.vercel.app/play',
+    )
   })
 })

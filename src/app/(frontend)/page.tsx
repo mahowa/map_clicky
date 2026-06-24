@@ -22,6 +22,11 @@ export default async function HomePage() {
         </div>
         <p className="mc-note">Tap where you think each place is. Closer = more points.</p>
       </div>
+      <footer className="mc-footer">
+        <a href="https://github.com/mahowa/map_clicky" target="_blank" rel="noopener noreferrer">
+          Open source — contribute on GitHub
+        </a>
+      </footer>
     </div>
   )
 }
