@@ -75,8 +75,9 @@ export function shareHeading(
   title: string,
   dateKey: string,
 ): string {
-  if (kind === 'daily') return `Terra Tap — ${formatShareDate(dateKey)}`
-  if (kind === 'speed') return `Terra Tap Speed Run — ${formatShareDate(dateKey)}`
+  if (kind === 'daily' && dateKey) return `Terra Tap — ${formatShareDate(dateKey)}`
+  // Undated speed runs are practice (#33) and share under their title instead.
+  if (kind === 'speed' && dateKey) return `Terra Tap Speed Run — ${formatShareDate(dateKey)}`
   return `Terra Tap — ${title}`
 }
 

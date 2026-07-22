@@ -337,6 +337,21 @@
   color: #e2e8f0;
   max-width: 420px;
 }
+/* Practice-run links (#33): gate footnote + results CTA styled as a button. */
+.gg-gate-alt {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+.gg-gate-alt a {
+  color: #7dd3fc;
+}
+.gg-btn-anchor {
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
 /* Stats strip on the results screen for the dated modes (#32). */
 .gg-stats {
   display: flex;

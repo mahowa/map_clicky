@@ -58,6 +58,12 @@ describe('shareHeading (#31)', () => {
     )
   })
 
+  it('titles undated speed practice runs instead of dating them (#33)', () => {
+    expect(shareHeading('speed', 'Speed Run Practice', '')).toBe(
+      'Terra Tap — Speed Run Practice',
+    )
+  })
+
   it('titles quizzes and history', () => {
     expect(shareHeading('quiz', 'US State Capitals', '')).toBe('Terra Tap — US State Capitals')
     expect(shareHeading('history', 'Geography History', '')).toBe(
