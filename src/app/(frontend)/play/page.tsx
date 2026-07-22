@@ -5,6 +5,12 @@ import './play.css'
 
 export const dynamic = 'force-dynamic'
 
+export const metadata = {
+  title: 'Play the Daily',
+  description:
+    "Today's five places, one guess each. Tap the globe where you think each one is — closer means more points.",
+}
+
 export default async function PlayPage() {
   const run = await getDailyRun()
 

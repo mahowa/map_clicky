@@ -1,9 +1,19 @@
 import React from 'react'
 import './styles.css'
+import { buildSiteMetadata, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/seo'
 
-export const metadata = {
-  description: 'Find the world on a 3D globe. Race the clock, then battle head-to-head.',
-  title: 'Terra Tap',
+export const metadata = buildSiteMetadata()
+
+// Structured data so search engines understand this is a playable game.
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: SITE_NAME,
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  applicationCategory: 'GameApplication',
+  operatingSystem: 'Any',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
 }
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
@@ -12,6 +22,10 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <main>{children}</main>
       </body>
     </html>
