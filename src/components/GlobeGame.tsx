@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import type { Map as MlMap, Marker as MlMarker, StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
@@ -15,6 +16,8 @@ import {
   type CountryGeometry,
 } from '@/lib/country-lookup'
 import { SPEED_ROUND_SECONDS, expiryAction, formatDuration } from '@/lib/speed'
+import { legacyDailyLockKey } from '@/lib/locks'
+import { otherGameLinks, runKind } from '@/lib/nav'
 import {
   challengeUrl,
   formatChallengeShare,
@@ -108,16 +111,12 @@ type SavedRound = {
 }
 type SavedDaily = { dateKey: string; total: number; rounds: SavedRound[] }
 
-const storageKey = (dateKey: string) => `terratap:daily:${dateKey}`
-/** Pre-rename key (issue #8) — read as a fallback so an in-flight day isn't lost. */
-const legacyStorageKey = (dateKey: string) => `mapclippy:daily:${dateKey}`
-
-function loadSavedDaily(dateKey: string): SavedDaily | null {
-  if (typeof window === 'undefined' || !dateKey) return null
+function loadSaved(lockKey: string, legacyKey?: string): SavedDaily | null {
+  if (typeof window === 'undefined' || !lockKey) return null
   try {
     const raw =
-      window.localStorage.getItem(storageKey(dateKey)) ??
-      window.localStorage.getItem(legacyStorageKey(dateKey))
+      window.localStorage.getItem(lockKey) ??
+      (legacyKey ? window.localStorage.getItem(legacyKey) : null)
     if (!raw) return null
     const parsed = JSON.parse(raw) as SavedDaily
     return Array.isArray(parsed.rounds) ? parsed : null
@@ -126,10 +125,10 @@ function loadSavedDaily(dateKey: string): SavedDaily | null {
   }
 }
 
-function saveDaily(data: SavedDaily): void {
-  if (typeof window === 'undefined' || !data.dateKey) return
+function saveLocked(data: SavedDaily, lockKey: string): void {
+  if (typeof window === 'undefined' || !lockKey) return
   try {
-    window.localStorage.setItem(storageKey(data.dateKey), JSON.stringify(data))
+    window.localStorage.setItem(lockKey, JSON.stringify(data))
   } catch {
     /* ignore quota / private-mode errors */
   }
@@ -171,16 +170,20 @@ export default function GlobeGame({
   const expireRef = useRef<() => void>(() => {})
   const roundStartRef = useRef<number>(0)
 
-  // On mount, if today's daily was already played in this browser, jump to results.
+  // On mount, if this lockable run was already played in this browser
+  // (daily or speed run, #21), jump straight to the saved results.
   useEffect(() => {
-    if (run.mode !== 'daily') return
-    const prior = loadSavedDaily(run.dateKey)
+    if (!run.lockKey) return
+    const prior = loadSaved(
+      run.lockKey,
+      run.mode === 'daily' ? legacyDailyLockKey(run.dateKey) : undefined,
+    )
     if (prior) {
       setSaved(prior)
       setPlayedEarlier(true)
       setPhase('done')
     }
-  }, [run.mode, run.dateKey])
+  }, [run.lockKey, run.mode, run.dateKey])
 
   const round = run.rounds[index]
   const answer: LatLng | null = useMemo(
@@ -428,18 +431,18 @@ export default function GlobeGame({
     setPhase('guessing')
   }, [])
 
-  // Persist a freshly-completed daily to the browser (locks it for the rest of the day).
+  // Persist a freshly-completed lockable run (daily / speed) to the browser.
   useEffect(() => {
-    if (phase !== 'done' || run.mode !== 'daily' || playedEarlier || saved) return
+    if (phase !== 'done' || !run.lockKey || playedEarlier || saved) return
     if (results.length !== run.rounds.length) return
     const data: SavedDaily = {
       dateKey: run.dateKey,
       total: results.reduce((sum, r) => sum + r.points, 0),
       rounds: results.map(toSavedRound),
     }
-    saveDaily(data)
+    saveLocked(data, run.lockKey)
     setSaved(data)
-  }, [phase, run.mode, run.dateKey, run.rounds.length, playedEarlier, saved, results])
+  }, [phase, run.lockKey, run.dateKey, run.rounds.length, playedEarlier, saved, results])
 
   const total = results.reduce((sum, r) => sum + r.points, 0)
   const lastResult = results[results.length - 1]
@@ -546,7 +549,7 @@ export default function GlobeGame({
             </p>
           </div>
         )}
-        {isDaily ? (
+        {isDaily && (
           <div className="gg-share">
             <pre className="gg-share-text">{shareText}</pre>
             <button className="gg-btn gg-btn-primary" onClick={onShare}>
@@ -554,13 +557,26 @@ export default function GlobeGame({
             </button>
             <p className="gg-comeback">Come back tomorrow for a new daily.</p>
           </div>
-        ) : (
-          !isVersus && (
-            <button className="gg-btn gg-btn-primary" onClick={restart}>
-              Play again
-            </button>
-          )
         )}
+        {/* Locked runs (daily, speed) never replay; versus rechallenges instead (#21). */}
+        {!isDaily && !isVersus && !run.lockKey && (
+          <button className="gg-btn gg-btn-primary" onClick={restart}>
+            Play again
+          </button>
+        )}
+        {run.timed && run.lockKey && (
+          <p className="gg-comeback">Come back tomorrow for a new speed run.</p>
+        )}
+        <nav className="gg-nav">
+          <Link className="gg-nav-link" href="/">
+            Main menu
+          </Link>
+          {otherGameLinks(runKind(run)).map((l) => (
+            <Link key={l.href} className="gg-nav-link" href={l.href}>
+              {l.label}
+            </Link>
+          ))}
+        </nav>
       </div>
     )
   }

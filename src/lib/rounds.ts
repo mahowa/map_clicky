@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@/payload.config'
 import type { Difficulty } from './scoring'
 import type { GameRun, Round } from './game-types'
+import { dailyLockKey } from './locks'
 
 type LocationLike = {
   name: string
@@ -67,7 +68,13 @@ export async function getDailyRun(now: Date = new Date()): Promise<GameRun> {
       )
     if (rounds.length > 0) {
       const dateKey = typeof set.date === 'string' ? set.date.slice(0, 10) : ''
-      return { title: `Daily — ${dateKey || 'Daily'}`, rounds, mode: 'daily', dateKey }
+      return {
+        title: `Daily — ${dateKey || 'Daily'}`,
+        rounds,
+        mode: 'daily',
+        dateKey,
+        lockKey: dateKey ? dailyLockKey(dateKey) : undefined,
+      }
     }
   }
 

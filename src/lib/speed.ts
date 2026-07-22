@@ -1,12 +1,15 @@
 import type { GameRun, Round } from './game-types'
 import { QUIZZES, type QuizPlace } from './quizzes'
-import { pick } from './rng'
+import { pick, seededRng } from './rng'
 
 /**
  * Speed Run (issue #9): the classic game against the clock. Each round gives
  * the player a fixed countdown; when it expires the current guess auto-submits
  * (no guess = zero for the round). Pure helpers here; the ticking lives in the
  * component.
+ *
+ * Like the daily, the speed run is seeded by the UTC day — everyone gets the
+ * same hand, and it locks after one play (issue #21).
  */
 
 export const SPEED_ROUND_SECONDS = 15
@@ -36,10 +39,24 @@ const toRound = (place: QuizPlace): Round => ({
   fact: null,
 })
 
-/** A timed practice run sampled from the whole speed pool. */
-export function buildSpeedRun(rng: () => number, count: number = SPEED_RUN_LENGTH): GameRun {
+/** Browser storage key locking a day's speed run after one play. */
+export const speedLockKey = (dateKey: string) => `terratap:speed:${dateKey}`
+
+/**
+ * The day's speed run: deterministically dealt from the UTC day key so every
+ * player races the same five places, and lockable to a single play.
+ */
+export function buildSpeedRun(dateKey: string, count: number = SPEED_RUN_LENGTH): GameRun {
+  const rng = seededRng(`speed:${dateKey}`)
   const rounds = pick(speedPool(), count, rng).map(toRound)
-  return { title: 'Speed Run', rounds, mode: 'practice', dateKey: '', timed: true }
+  return {
+    title: 'Speed Run',
+    rounds,
+    mode: 'practice',
+    dateKey,
+    timed: true,
+    lockKey: speedLockKey(dateKey),
+  }
 }
 
 /** What to do when the round clock hits zero. */
