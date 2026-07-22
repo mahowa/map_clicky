@@ -25,4 +25,6 @@ export type GameRun = {
   mode: 'daily' | 'practice'
   /** UTC day key (YYYY-MM-DD) for the daily; '' for practice. Used as the localStorage key. */
   dateKey: string
+  /** Timed "speed run": each round is played against a countdown (issue #9). */
+  timed?: boolean
 }
