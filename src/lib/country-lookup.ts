@@ -9,11 +9,12 @@ import type { LatLng } from './scoring'
 
 type Position = [number, number]
 type Ring = Position[]
-type CountryFeature = {
+export type CountryGeometry =
+  | { type: 'Polygon'; coordinates: Ring[] }
+  | { type: 'MultiPolygon'; coordinates: Ring[][] }
+export type CountryFeature = {
   properties: { name: string }
-  geometry:
-    | { type: 'Polygon'; coordinates: Ring[] }
-    | { type: 'MultiPolygon'; coordinates: Ring[][] }
+  geometry: CountryGeometry
 }
 export type CountryCollection = { features: CountryFeature[] }
 
@@ -40,19 +41,27 @@ export function pointInPolygon(point: LatLng, rings: Ring[]): boolean {
   return true
 }
 
-/** Name of the country containing the point, or null (ocean / uncovered). */
-export function countryAtSync(point: LatLng, countries: CountryCollection): string | null {
+/** Full feature (name + geometry) of the country containing the point, or null. */
+export function countryFeatureAtSync(
+  point: LatLng,
+  countries: CountryCollection,
+): CountryFeature | null {
   for (const f of countries.features) {
     const g = f.geometry
     if (g.type === 'Polygon') {
-      if (pointInPolygon(point, g.coordinates)) return f.properties.name
+      if (pointInPolygon(point, g.coordinates)) return f
     } else {
       for (const poly of g.coordinates) {
-        if (pointInPolygon(point, poly)) return f.properties.name
+        if (pointInPolygon(point, poly)) return f
       }
     }
   }
   return null
+}
+
+/** Name of the country containing the point, or null (ocean / uncovered). */
+export function countryAtSync(point: LatLng, countries: CountryCollection): string | null {
+  return countryFeatureAtSync(point, countries)?.properties.name ?? null
 }
 
 let dataPromise: Promise<CountryCollection> | null = null
@@ -68,6 +77,11 @@ function loadCountries(): Promise<CountryCollection> {
 /** Async lookup that lazy-loads the dataset on first use. */
 export async function countryAt(point: LatLng): Promise<string | null> {
   return countryAtSync(point, await loadCountries())
+}
+
+/** Async feature lookup (for drawing the answer's region on reveal, issue #6). */
+export async function countryFeatureAt(point: LatLng): Promise<CountryFeature | null> {
+  return countryFeatureAtSync(point, await loadCountries())
 }
 
 /**
