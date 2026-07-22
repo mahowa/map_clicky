@@ -8,6 +8,7 @@ import type { GameRun, Round } from '@/lib/game-types'
 import { formatDailyShare } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
 import { cameraActionFor, pairBounds } from '@/lib/camera'
+import { countryAt, describeMiss } from '@/lib/country-lookup'
 
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
@@ -56,6 +57,10 @@ type RoundResult = {
   base: number
   multiplier: number
   reaction: string
+  /** Country the guess landed in (null = ocean/uncovered); shown on misses (#2). */
+  guessCountry: string | null
+  /** Country containing the answer, from the same dataset so names compare cleanly. */
+  answerCountry: string | null
 }
 
 /** Serializable per-round result persisted to the browser for the daily lock. */
@@ -239,9 +244,14 @@ export default function GlobeGame({ run }: { run: GameRun }) {
     }
   }, [ready, guess, phase, answer])
 
-  const submitGuess = useCallback(() => {
+  const submitGuess = useCallback(async () => {
     if (!guess || !round || !answer) return
     const s = scoreRound(guess, answer, round.difficulty)
+    // Both looked up in the same offline dataset so the names compare cleanly.
+    const [guessCountry, answerCountry] = await Promise.all([
+      countryAt(guess),
+      countryAt(answer),
+    ])
     setResults((prev) => [
       ...prev,
       {
@@ -252,6 +262,8 @@ export default function GlobeGame({ run }: { run: GameRun }) {
         base: s.base,
         multiplier: s.multiplier,
         reaction: pickReaction(s.base),
+        guessCountry,
+        answerCountry,
       },
     ])
     setPhase('revealed')
@@ -410,6 +422,14 @@ export default function GlobeGame({ run }: { run: GameRun }) {
             <div className="gg-result-dist">
               {Math.round(lastResult.distanceKm).toLocaleString()} km away
             </div>
+            {(() => {
+              const miss = describeMiss(
+                lastResult.guessCountry,
+                lastResult.answerCountry,
+                lastResult.base,
+              )
+              return miss ? <p className="gg-miss-country">{miss}</p> : null
+            })()}
             <p className="gg-reaction">{lastResult.reaction}</p>
             {lastResult.round.fact && <p className="gg-fact">{lastResult.round.fact}</p>}
             <button className="gg-btn gg-btn-primary" onClick={next}>
