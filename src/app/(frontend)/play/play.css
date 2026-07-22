@@ -171,6 +171,31 @@
   color: #94a3b8;
   font-size: 15px;
 }
+.gg-timer {
+  font-size: 28px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #38bdf8;
+  margin-bottom: 6px;
+}
+.gg-timer-low {
+  color: #f87171;
+  animation: gg-timer-pulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes gg-timer-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+.gg-time-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin: 0 0 8px;
+}
 .gg-miss-country {
   margin: 6px 0 0;
   font-size: 15px;

@@ -14,6 +14,7 @@ import {
   describeMiss,
   type CountryGeometry,
 } from '@/lib/country-lookup'
+import { SPEED_ROUND_SECONDS, expiryAction, formatDuration } from '@/lib/speed'
 
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
@@ -57,8 +58,9 @@ type Phase = 'guessing' | 'revealed' | 'done'
 
 type RoundResult = {
   round: Round
-  guess: LatLng
-  distanceKm: number
+  /** null = the speed-run clock expired with no guess placed. */
+  guess: LatLng | null
+  distanceKm: number | null
   points: number
   base: number
   multiplier: number
@@ -77,7 +79,8 @@ type SavedRound = {
   base: number
   multiplier: number
   points: number
-  distanceKm: number
+  /** null = timed out with no guess. */
+  distanceKm: number | null
 }
 type SavedDaily = { dateKey: string; total: number; rounds: SavedRound[] }
 
@@ -126,11 +129,16 @@ export default function GlobeGame({ run }: { run: GameRun }) {
   const [saved, setSaved] = useState<SavedDaily | null>(null)
   const [playedEarlier, setPlayedEarlier] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Speed run (#9): ms left on the current round's clock, and total play time.
+  const [remainingMs, setRemainingMs] = useState<number | null>(null)
+  const [elapsedMs, setElapsedMs] = useState(0)
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
   const markersRef = useRef<MlMarker[]>([])
   const clickRef = useRef<(p: { lng: number; lat: number }) => void>(() => {})
+  const expireRef = useRef<() => void>(() => {})
+  const roundStartRef = useRef<number>(0)
 
   // On mount, if today's daily was already played in this browser, jump to results.
   useEffect(() => {
@@ -288,7 +296,10 @@ export default function GlobeGame({ run }: { run: GameRun }) {
   }, [ready, guess, phase, answer, results])
 
   const submitGuess = useCallback(async () => {
-    if (!guess || !round || !answer) return
+    if (!guess || !round || !answer || phase !== 'guessing') return
+    if (run.timed && roundStartRef.current) {
+      setElapsedMs((e) => e + (Date.now() - roundStartRef.current))
+    }
     const s = scoreRound(guess, answer, round.difficulty)
     // Both looked up in the same offline dataset so the names compare cleanly.
     const [guessCountry, answerFeature] = await Promise.all([
@@ -313,7 +324,59 @@ export default function GlobeGame({ run }: { run: GameRun }) {
       },
     ])
     setPhase('revealed')
-  }, [guess, round, answer])
+  }, [guess, round, answer, phase, run.timed])
+
+  // Speed-run clock hit zero with no guess placed: score the round as a zero.
+  const timeoutRound = useCallback(async () => {
+    if (!round || !answer || phase !== 'guessing') return
+    if (roundStartRef.current) {
+      setElapsedMs((e) => e + (Date.now() - roundStartRef.current))
+    }
+    const answerFeature = await countryFeatureAt(answer)
+    setResults((prev) => [
+      ...prev,
+      {
+        round,
+        guess: null,
+        distanceKm: null,
+        points: 0,
+        base: 0,
+        multiplier: DIFFICULTY_MULTIPLIER[round.difficulty],
+        reaction: '⏰ Time ran out before you pulled the trigger.',
+        guessCountry: null,
+        answerCountry: answerFeature?.properties.name ?? null,
+        answerRegion: answerFeature?.geometry ?? null,
+      },
+    ])
+    setPhase('revealed')
+  }, [round, answer, phase])
+
+  // Keep the expiry handler pointing at the latest closures (same pattern as clickRef).
+  useEffect(() => {
+    expireRef.current = () => {
+      if (expiryAction(!!guess) === 'submit') void submitGuess()
+      else void timeoutRound()
+    }
+  }, [guess, submitGuess, timeoutRound])
+
+  // Arm the countdown at each timed round's start; tick every 100ms; act on expiry.
+  useEffect(() => {
+    if (!run.timed || phase !== 'guessing' || !ready || !round) return
+    roundStartRef.current = Date.now()
+    const deadline = Date.now() + SPEED_ROUND_SECONDS * 1000
+    setRemainingMs(SPEED_ROUND_SECONDS * 1000)
+    const id = window.setInterval(() => {
+      const left = deadline - Date.now()
+      if (left <= 0) {
+        window.clearInterval(id)
+        setRemainingMs(0)
+        expireRef.current()
+      } else {
+        setRemainingMs(left)
+      }
+    }, 100)
+    return () => window.clearInterval(id)
+  }, [run.timed, phase, ready, round])
 
   const next = useCallback(() => {
     if (index + 1 >= run.rounds.length) {
@@ -329,6 +392,8 @@ export default function GlobeGame({ run }: { run: GameRun }) {
     setIndex(0)
     setGuess(null)
     setResults([])
+    setElapsedMs(0)
+    setRemainingMs(null)
     setPhase('guessing')
   }, [])
 
@@ -389,12 +454,15 @@ export default function GlobeGame({ run }: { run: GameRun }) {
           <span className="gg-outof"> / {maxPossible}</span>
         </p>
         <p className="gg-verdict">{verdict}</p>
+        {run.timed && <p className="gg-time-total">Total time: {formatDuration(elapsedMs)}</p>}
         <ul className="gg-summary">
           {summary.map((r, i) => (
             <li key={i}>
               <div className="gg-summary-row">
                 <span className="gg-city">{r.name}</span>
-                <span className="gg-dist">{Math.round(r.distanceKm).toLocaleString()} km</span>
+                <span className="gg-dist">
+                  {r.distanceKm === null ? '—' : `${Math.round(r.distanceKm).toLocaleString()} km`}
+                </span>
                 <span className="gg-base">
                   {r.base}/100 ×{r.multiplier}
                 </span>
@@ -440,6 +508,11 @@ export default function GlobeGame({ run }: { run: GameRun }) {
 
         {phase === 'guessing' && round && (
           <div className="gg-panel">
+            {run.timed && remainingMs !== null && (
+              <div className={`gg-timer${remainingMs < 5000 ? ' gg-timer-low' : ''}`}>
+                {Math.ceil(remainingMs / 1000)}s
+              </div>
+            )}
             <div className="gg-prompt">
               Find: <strong>{round.country ? `${round.name}, ${round.country}` : round.name}</strong>
               <span className={`gg-diff gg-diff-${round.difficulty}`}>
@@ -467,16 +540,19 @@ export default function GlobeGame({ run }: { run: GameRun }) {
               </span>
             </div>
             <div className="gg-result-dist">
-              {Math.round(lastResult.distanceKm).toLocaleString()} km away
+              {lastResult.distanceKm === null
+                ? 'No guess placed in time.'
+                : `${Math.round(lastResult.distanceKm).toLocaleString()} km away`}
             </div>
-            {(() => {
-              const miss = describeMiss(
-                lastResult.guessCountry,
-                lastResult.answerCountry,
-                lastResult.base,
-              )
-              return miss ? <p className="gg-miss-country">{miss}</p> : null
-            })()}
+            {lastResult.guess !== null &&
+              (() => {
+                const miss = describeMiss(
+                  lastResult.guessCountry,
+                  lastResult.answerCountry,
+                  lastResult.base,
+                )
+                return miss ? <p className="gg-miss-country">{miss}</p> : null
+              })()}
             <p className="gg-reaction">{lastResult.reaction}</p>
             {lastResult.round.fact && <p className="gg-fact">{lastResult.round.fact}</p>}
             <button className="gg-btn gg-btn-primary" onClick={next}>
