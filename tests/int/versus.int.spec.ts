@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   VERSUS_RUN_LENGTH,
   buildVersusRun,
+  challengeBannerText,
   challengeUrl,
   encodeBases,
   formatChallengeShare,
   newVersusSeed,
+  opponentRunningTotal,
   parseBases,
   pointsFromBase,
   totalFromBases,
@@ -87,6 +89,34 @@ describe('versusOutcome', () => {
     expect(versusOutcome(250, 250).result).toBe('tie')
     expect(versusOutcome(300, 200).message).toContain('300')
     expect(versusOutcome(300, 200).message).toContain('200')
+  })
+})
+
+describe('challenge context (#27)', () => {
+  it('banner names the score to beat', () => {
+    expect(challengeBannerText(54)).toContain('54')
+    expect(challengeBannerText(54)).toMatch(/challenged/i)
+  })
+
+  it("tracks the opponent's pace through the rounds played so far", () => {
+    const rounds = [round('easy'), round('medium'), round('hard')]
+    const bases = [100, 50, 10]
+    expect(opponentRunningTotal(bases, rounds, 0)).toBe(0)
+    expect(opponentRunningTotal(bases, rounds, 1)).toBe(100)
+    expect(opponentRunningTotal(bases, rounds, 2)).toBe(100 + 100)
+    expect(opponentRunningTotal(bases, rounds, 3)).toBe(100 + 100 + 30)
+  })
+
+  it('pace through every round equals the full total', () => {
+    const rounds = [round('easy'), round('medium'), round('hard')]
+    const bases = [90, 80, 70]
+    expect(opponentRunningTotal(bases, rounds, rounds.length)).toBe(
+      totalFromBases(bases, rounds),
+    )
+  })
+
+  it('clamps a negative rounds-played to zero', () => {
+    expect(opponentRunningTotal([100], [round('easy')], -1)).toBe(0)
   })
 })
 

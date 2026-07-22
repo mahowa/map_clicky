@@ -32,8 +32,10 @@ import {
 } from '@/lib/progress'
 import { otherGameLinks, runKind } from '@/lib/nav'
 import {
+  challengeBannerText,
   challengeUrl,
   formatChallengeShare,
+  opponentRunningTotal,
   pointsFromBase,
   totalFromBases,
   versusOutcome,
@@ -538,6 +540,13 @@ export default function GlobeGame({
   const total = results.reduce((sum, r) => sum + r.points, 0)
   const lastResult = results[results.length - 1]
 
+  // Versus challenge (#27): the challenged player sees the score to beat from
+  // round 1, plus the opponent's pace through the same number of rounds.
+  const challengeTotal =
+    opponentBases ? totalFromBases(opponentBases, run.rounds) : null
+  const opponentPace =
+    opponentBases ? opponentRunningTotal(opponentBases, run.rounds, results.length) : null
+
   const maxPossible = run.rounds.reduce(
     (s, r) => s + 100 * DIFFICULTY_MULTIPLIER[r.difficulty],
     0,
@@ -679,11 +688,18 @@ export default function GlobeGame({
       </div>
 
       <div className="gg-hud">
-        <div className="gg-top">
-          <span className="gg-run-title">{run.title}</span>
-          <span className="gg-progress">
-            Round {index + 1} / {run.rounds.length} · Score {total}
-          </span>
+        <div>
+          <div className="gg-top">
+            <span className="gg-run-title">{run.title}</span>
+            <span className="gg-progress">
+              Round {index + 1} / {run.rounds.length} ·{' '}
+              {challengeTotal !== null ? `You ${total} · Them ${opponentPace}` : `Score ${total}`}
+            </span>
+          </div>
+          {/* Challenge context (#27): the score to beat, on screen from round 1. */}
+          {challengeTotal !== null && (
+            <div className="gg-challenge-banner">{challengeBannerText(challengeTotal)}</div>
+          )}
         </div>
 
         {/* Start gate (#24): the clock — and the round's place name — hold until
@@ -770,6 +786,13 @@ export default function GlobeGame({
                 )
                 return miss ? <p className="gg-miss-country">{miss}</p> : null
               })()}
+            {/* Round-by-round tension (#27): what the challenger took here. */}
+            {opponentBases && round && (
+              <p className="gg-opp-round">
+                They scored +{pointsFromBase(opponentBases[index], round)} here · {total} to{' '}
+                {opponentPace} overall
+              </p>
+            )}
             <p className="gg-reaction">{lastResult.reaction}</p>
             {lastResult.round.fact && <p className="gg-fact">{lastResult.round.fact}</p>}
             <button className="gg-btn gg-btn-primary" onClick={next}>

@@ -60,6 +60,28 @@ export function totalFromBases(bases: number[], rounds: Round[]): number {
   return bases.reduce((sum, base, i) => sum + (rounds[i] ? pointsFromBase(base, rounds[i]) : 0), 0)
 }
 
+/**
+ * Opponent's running total through the first `roundsPlayed` rounds (#27) —
+ * the live "them" score shown while the challenged player works through the
+ * same places.
+ */
+export function opponentRunningTotal(
+  bases: number[],
+  rounds: Round[],
+  roundsPlayed: number,
+): number {
+  return totalFromBases(bases.slice(0, Math.max(0, roundsPlayed)), rounds)
+}
+
+/**
+ * Persistent banner for the challenged player (#27): opening a challenge link
+ * previously looked like a normal solo game until the very end — the score to
+ * beat has to be on screen from round 1.
+ */
+export function challengeBannerText(theirTotal: number): string {
+  return `⚔️ You've been challenged — beat ${theirTotal}`
+}
+
 export type VersusOutcome = { result: 'win' | 'lose' | 'tie'; message: string }
 
 /** Winner banner for the results screen. */
