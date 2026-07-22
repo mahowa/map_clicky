@@ -193,6 +193,30 @@
   background: rgba(148, 163, 184, 0.18);
   border-color: rgba(56, 189, 248, 0.5);
 }
+/* Persistent "score to beat" chip under the top bar for challenge links (#27). */
+.gg-challenge-banner {
+  margin-top: 8px;
+  justify-self: start;
+  width: fit-content;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(8, 20, 38, 0.82);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 700;
+  text-shadow: none;
+  backdrop-filter: blur(6px);
+}
+
+/* Reveal-panel line comparing this round against the challenger (#27). */
+.gg-opp-round {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #7dd3fc;
+}
+
 .gg-versus-banner {
   font-size: 20px;
   font-weight: 800;
