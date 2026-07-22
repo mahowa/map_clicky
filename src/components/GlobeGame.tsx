@@ -728,7 +728,12 @@ export default function GlobeGame({
           </button>
         )}
         {run.timed && run.lockKey && (
-          <p className="gg-comeback">Come back tomorrow for a new speed run.</p>
+          <>
+            <p className="gg-comeback">Come back tomorrow for a new speed run.</p>
+            <Link className="gg-btn gg-btn-primary gg-btn-anchor" href="/speed/practice">
+              Practice run (unranked)
+            </Link>
+          </>
         )}
         <nav className="gg-nav">
           <Link className="gg-nav-link" href="/">
@@ -782,6 +787,13 @@ export default function GlobeGame({
             >
               {ready ? 'Start run' : 'Loading globe…'}
             </button>
+            {/* Ranked run gate offers the unranked trainer (#33). */}
+            {run.lockKey && (
+              <p className="gg-gate-alt">
+                One attempt today counts —{' '}
+                <Link href="/speed/practice">or warm up with a practice run</Link>
+              </p>
+            )}
           </div>
         )}
 

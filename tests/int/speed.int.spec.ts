@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   SPEED_ROUND_SECONDS,
   SPEED_RUN_LENGTH,
+  buildPracticeSpeedRun,
   buildSpeedRun,
   expiryAction,
   formatDuration,
@@ -10,6 +11,8 @@ import {
   speedLockKey,
   speedPool,
 } from '@/lib/speed'
+import { seededRng } from '@/lib/rng'
+import { getQuiz } from '@/lib/quizzes'
 
 describe('speedPool', () => {
   it('merges all quiz pools without duplicates', () => {
@@ -65,6 +68,40 @@ describe('expiryAction', () => {
   })
   it('scores a zero when no guess was placed', () => {
     expect(expiryAction(false)).toBe('zero')
+  })
+})
+
+describe('buildPracticeSpeedRun (#33)', () => {
+  it('is timed but carries no lock and no date — replays freely, never counts', () => {
+    const run = buildPracticeSpeedRun(seededRng('p1'))!
+    expect(run.timed).toBe(true)
+    expect(run.lockKey).toBeUndefined()
+    expect(run.dateKey).toBe('')
+    expect(run.mode).toBe('practice')
+    expect(run.title).toBe('Speed Run Practice')
+    expect(run.rounds.length).toBe(SPEED_RUN_LENGTH)
+  })
+
+  it('deals different hands across runs (unseeded trainer)', () => {
+    const a = buildPracticeSpeedRun(seededRng('p1'))!.rounds.map((r) => r.name)
+    const b = buildPracticeSpeedRun(seededRng('p2'))!.rounds.map((r) => r.name)
+    expect(a).not.toEqual(b)
+  })
+
+  it('drills a single quiz pool when given its slug', () => {
+    const run = buildPracticeSpeedRun(seededRng('p1'), 'us-state-capitals')!
+    expect(run.title).toBe('Speed Run — US State Capitals')
+    const poolNames = new Set(getQuiz('us-state-capitals')!.pool.map((p) => p.name))
+    for (const r of run.rounds) expect(poolNames.has(r.name)).toBe(true)
+  })
+
+  it('rejects an unknown quiz slug', () => {
+    expect(buildPracticeSpeedRun(seededRng('p1'), 'not-a-quiz')).toBeNull()
+  })
+
+  it('still gates on mount like every timed run (#24)', () => {
+    const run = buildPracticeSpeedRun(seededRng('p1'))!
+    expect(showStartGate(!!run.timed, initialStarted(!!run.timed))).toBe(true)
   })
 })
 

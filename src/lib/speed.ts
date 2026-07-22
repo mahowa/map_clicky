@@ -1,5 +1,5 @@
 import type { GameRun, Round } from './game-types'
-import { QUIZZES, type QuizPlace } from './quizzes'
+import { QUIZZES, getQuiz, type QuizPlace } from './quizzes'
 import { pick, seededRng } from './rng'
 
 /**
@@ -57,6 +57,30 @@ export function buildSpeedRun(dateKey: string, count: number = SPEED_RUN_LENGTH)
     timed: true,
     lockKey: speedLockKey(dateKey),
   }
+}
+
+/**
+ * Unranked practice run (issue #33): same clock, fresh random places, no
+ * daily lock — so the once-a-day seeded run stays sacred while the skill it
+ * tests stays trainable. Optionally dealt from a single quiz pool ("Speed
+ * Run — US State Capitals"); returns null for an unknown quiz slug.
+ */
+export function buildPracticeSpeedRun(
+  rng: () => number,
+  quizSlug?: string | null,
+): GameRun | null {
+  let pool = speedPool()
+  let title = 'Speed Run Practice'
+  if (quizSlug) {
+    const quiz = getQuiz(quizSlug)
+    if (!quiz) return null
+    pool = quiz.pool
+    title = `Speed Run — ${quiz.title}`
+  }
+  const rounds = pick(pool, Math.min(SPEED_RUN_LENGTH, pool.length), rng).map(toRound)
+  // No lockKey and no dateKey: replays freely, never counts toward the daily
+  // result, streaks, or stats.
+  return { title, rounds, mode: 'practice', dateKey: '', timed: true }
 }
 
 /** What to do when the round clock hits zero. */
