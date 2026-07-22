@@ -171,6 +171,28 @@
   color: #94a3b8;
   font-size: 15px;
 }
+.gg-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+.gg-nav-link {
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  padding: 8px 16px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.gg-nav-link:hover {
+  background: rgba(148, 163, 184, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+}
 .gg-versus-banner {
   font-size: 20px;
   font-weight: 800;

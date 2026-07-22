@@ -36,4 +36,10 @@ export type GameRun = {
   labeled?: boolean
   /** Versus (#5): the challenge seed this run was dealt from. */
   versusSeed?: string
+  /**
+   * When set, the run locks after one completed play: the result is saved to
+   * this browser storage key and replays show the saved result instead (#21).
+   * The daily and the (daily-seeded) speed run both use this.
+   */
+  lockKey?: string
 }

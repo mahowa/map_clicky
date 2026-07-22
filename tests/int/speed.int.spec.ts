@@ -5,9 +5,9 @@ import {
   buildSpeedRun,
   expiryAction,
   formatDuration,
+  speedLockKey,
   speedPool,
 } from '@/lib/speed'
-import { seededRng } from '@/lib/rng'
 
 describe('speedPool', () => {
   it('merges all quiz pools without duplicates', () => {
@@ -27,21 +27,33 @@ describe('speedPool', () => {
 })
 
 describe('buildSpeedRun', () => {
-  it('builds a timed practice run of distinct places', () => {
-    const run = buildSpeedRun(seededRng('speed-test'))
+  it('builds a timed, lockable run of distinct places for the day', () => {
+    const run = buildSpeedRun('2026-07-22')
     expect(run.timed).toBe(true)
     expect(run.mode).toBe('practice')
-    expect(run.dateKey).toBe('')
+    expect(run.dateKey).toBe('2026-07-22')
+    expect(run.lockKey).toBe(speedLockKey('2026-07-22'))
     expect(run.title).toBe('Speed Run')
     expect(run.rounds.length).toBe(SPEED_RUN_LENGTH)
     const names = run.rounds.map((r) => `${r.name}|${r.country ?? ''}`)
     expect(new Set(names).size).toBe(names.length)
   })
 
-  it('is deterministic per seed', () => {
-    const a = buildSpeedRun(seededRng('s')).rounds.map((r) => r.name)
-    const b = buildSpeedRun(seededRng('s')).rounds.map((r) => r.name)
+  it('deals everyone the same hand on the same day (#21)', () => {
+    const a = buildSpeedRun('2026-07-22').rounds.map((r) => r.name)
+    const b = buildSpeedRun('2026-07-22').rounds.map((r) => r.name)
     expect(a).toEqual(b)
+  })
+
+  it('deals a different hand on a different day', () => {
+    const a = buildSpeedRun('2026-07-22').rounds.map((r) => r.name)
+    const b = buildSpeedRun('2026-07-23').rounds.map((r) => r.name)
+    expect(a).not.toEqual(b)
+  })
+
+  it("uses a lock key namespace distinct from the daily's", () => {
+    expect(speedLockKey('2026-07-22')).toBe('terratap:speed:2026-07-22')
+    expect(speedLockKey('2026-07-22')).not.toContain('daily')
   })
 })
 
