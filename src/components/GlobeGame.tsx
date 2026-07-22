@@ -8,7 +8,7 @@ import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
 import type { GameRun, Round } from '@/lib/game-types'
 import { formatRunShare, sharePlan, shareHeading, shareUrlFromLocation } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
-import { cameraActionFor, pairBounds } from '@/lib/camera'
+import { cameraActionFor, initialGlobeZoom, pairBounds } from '@/lib/camera'
 import { collapseAttribution } from '@/lib/attribution'
 import {
   countryAt,
@@ -85,10 +85,11 @@ function buildMapStyle(labeled: boolean): StyleSpecification {
 const LINE_SOURCE = 'gg-line'
 const REGION_SOURCE = 'gg-region'
 
-// Neutral full-globe framing the game starts from. Applied after the globe
-// projection is active (the mercator→globe switch otherwise inflates zoom).
-// Later rounds keep the player's current view (see cameraActionFor, issue #7).
-const GLOBE_VIEW: { center: [number, number]; zoom: number } = { center: [0, 20], zoom: 0.9 }
+// Neutral full-globe framing the game starts from; the zoom is sized to the
+// viewport at mount (issue #34). Applied after the globe projection is active
+// (the mercator→globe switch otherwise inflates zoom). Later rounds keep the
+// player's current view (see cameraActionFor, issue #7).
+const GLOBE_CENTER: [number, number] = [0, 20]
 
 /** A small colored dot marker element for guess/answer. */
 function markerEl(color: string): HTMLDivElement {
@@ -279,11 +280,16 @@ export default function GlobeGame({
     let cancelled = false
     import('maplibre-gl').then(({ Map }) => {
       if (cancelled || !wrapRef.current) return
+      // Fill most of the short viewport side with the globe (#34).
+      const startView = {
+        center: GLOBE_CENTER,
+        zoom: initialGlobeZoom(wrapRef.current.clientWidth, wrapRef.current.clientHeight),
+      }
       map = new Map({
         container: wrapRef.current,
         style: buildMapStyle(!!run.labeled),
-        center: GLOBE_VIEW.center,
-        zoom: GLOBE_VIEW.zoom,
+        center: startView.center,
+        zoom: startView.zoom,
         attributionControl: { compact: true },
         maxPitch: 0,
         dragRotate: false,
@@ -293,7 +299,7 @@ export default function GlobeGame({
       map.on('style.load', () => {
         map?.setProjection({ type: 'globe' })
         // Re-apply after the projection switch so the start view is a full globe.
-        map?.jumpTo(GLOBE_VIEW)
+        map?.jumpTo(startView)
       })
       map.on('load', () => {
         setReady(true)

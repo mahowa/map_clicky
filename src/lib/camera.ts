@@ -18,6 +18,20 @@ export function cameraActionFor(
   return 'stay'
 }
 
+/**
+ * Initial globe zoom sized to the viewport (issue #34). The old fixed zoom
+ * (0.9) looked right on phones but left the globe a small sphere in ~30% of a
+ * desktop viewport. MapLibre's globe renders with a pixel diameter of roughly
+ * tileSize·2^zoom/π, so the zoom that fills `fill` of the short viewport side
+ * is log2(minSide·fill·π/tileSize). Clamped to sane globe range.
+ */
+export function initialGlobeZoom(width: number, height: number, fill = 0.78): number {
+  const minSide = Math.min(width, height)
+  if (!Number.isFinite(minSide) || minSide <= 0) return 0.9
+  const zoom = Math.log2((minSide * fill * Math.PI) / 512)
+  return Math.min(2.5, Math.max(0.5, zoom))
+}
+
 /** Bounds ([sw, ne]) framing both points, for MapLibre fitBounds. */
 export function pairBounds(
   a: LatLng,
