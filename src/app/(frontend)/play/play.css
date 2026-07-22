@@ -28,6 +28,68 @@
   pointer-events: none;
 }
 
+/* Keyboard play (#30): screen-reader-only text, center crosshair while the
+   map has keyboard focus, and visible focus rings. */
+.gg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.gg-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.gg-crosshair::before,
+.gg-crosshair::after {
+  content: '';
+  position: absolute;
+  background: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.gg-crosshair::before {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+}
+.gg-crosshair::after {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+}
+.gg-globe:focus-within .gg-crosshair {
+  opacity: 1;
+}
+
+.gg-globe canvas:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: -3px;
+}
+.gg-btn:focus-visible,
+.gg-nav-link:focus-visible,
+.gg-gate-alt a:focus-visible,
+.gg-btn-anchor:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
 .gg-hud {
   position: absolute;
   inset: 0;
