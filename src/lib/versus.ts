@@ -24,7 +24,16 @@ export function buildVersusRun(seed: string, count: number = VERSUS_RUN_LENGTH):
     difficulty: place.difficulty,
     fact: null,
   }))
-  return { title: 'Versus', rounds, mode: 'practice', dateKey: '', versusSeed: seed }
+  return {
+    title: 'Versus',
+    rounds,
+    mode: 'practice',
+    dateKey: '',
+    versusSeed: seed,
+    // One scored attempt per seed (#28): without a lock the challenged player
+    // could quietly replay the same five places until happy with the result.
+    lockKey: versusLockKey(seed),
+  }
 }
 
 /** Random URL-safe seed. rng injected (pages pass Math.random). */
@@ -95,9 +104,70 @@ export function versusOutcome(myTotal: number, theirTotal: number): VersusOutcom
   return { result: 'tie', message: `Dead heat — ${myTotal} apiece.` }
 }
 
+/**
+ * Challenge-link integrity (#28). Scores used to travel as plaintext
+ * (?s=0.0.5.40.4) — trivially editable into an unbeatable "challenge". The
+ * payload is now packed with a seed-bound checksum and base64url-encoded, so
+ * casual URL editing breaks the link instead of forging it. This is
+ * deterrence, not cryptography: the app is open source and fully
+ * client-side, so a determined cheat can always recompute the checksum.
+ */
+const CHALLENGE_SALT = 'terratap-versus-v1'
+
+/** FNV-1a over the string, as an unsigned 32-bit int. */
+function fnv1a(str: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return h >>> 0
+}
+
+const checksum = (seed: string, payload: string) =>
+  fnv1a(`${seed}|${payload}|${CHALLENGE_SALT}`).toString(36)
+
+/** Pack bases + seed-bound checksum into a URL-safe token. */
+export function encodeChallenge(bases: number[], seed: string): string {
+  const payload = encodeBases(bases)
+  const packed = `${payload}~${checksum(seed, payload)}`
+  return btoa(packed).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Unpack a challenge token for this seed; null when missing, malformed,
+ * checksum-mismatched (edited), or bound to a different seed.
+ */
+export function decodeChallenge(
+  raw: string | undefined | null,
+  seed: string,
+  expectedLength: number,
+): number[] | null {
+  if (!raw) return null
+  let packed: string
+  try {
+    const b64 = raw.replace(/-/g, '+').replace(/_/g, '/')
+    packed = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
+  } catch {
+    return null
+  }
+  const split = packed.lastIndexOf('~')
+  if (split < 0) return null
+  const payload = packed.slice(0, split)
+  if (packed.slice(split + 1) !== checksum(seed, payload)) return null
+  return parseBases(payload, expectedLength)
+}
+
+/**
+ * Browser storage key locking a versus seed to one scored attempt (#28).
+ * Riding the same lock machinery as the daily: finish once, and revisiting
+ * the link shows the saved result (with Rechallenge) instead of a fresh run.
+ */
+export const versusLockKey = (seed: string) => `terratap:versus:${seed}`
+
 /** Challenge URL for sharing: same seed, the sharer's bases attached. */
 export function challengeUrl(origin: string, seed: string, bases: number[]): string {
-  return `${origin}/versus?seed=${encodeURIComponent(seed)}&s=${encodeBases(bases)}`
+  return `${origin}/versus?seed=${encodeURIComponent(seed)}&s=${encodeChallenge(bases, seed)}`
 }
 
 /** Share text inviting an opponent to beat the sharer's total. */

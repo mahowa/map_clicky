@@ -4,13 +4,16 @@ import {
   buildVersusRun,
   challengeBannerText,
   challengeUrl,
+  decodeChallenge,
   encodeBases,
+  encodeChallenge,
   formatChallengeShare,
   newVersusSeed,
   opponentRunningTotal,
   parseBases,
   pointsFromBase,
   totalFromBases,
+  versusLockKey,
   versusOutcome,
 } from '@/lib/versus'
 import { seededRng } from '@/lib/rng'
@@ -92,6 +95,57 @@ describe('versusOutcome', () => {
   })
 })
 
+describe('challenge token integrity (#28)', () => {
+  const BASES = [100, 0, 55, 88, 72]
+  const SEED = 'abc123'
+
+  it('round-trips bases through encode/decode for the same seed', () => {
+    expect(decodeChallenge(encodeChallenge(BASES, SEED), SEED, 5)).toEqual(BASES)
+  })
+
+  it('rejects a token bound to a different seed', () => {
+    expect(decodeChallenge(encodeChallenge(BASES, SEED), 'other42', 5)).toBeNull()
+  })
+
+  it('rejects an edited token — casual URL tampering breaks the link', () => {
+    const token = encodeChallenge(BASES, SEED)
+    // Flip a leading character (trailing base64 chars can carry unused bits).
+    const edited = (token[0] === 'A' ? 'B' : 'A') + token.slice(1)
+    expect(decodeChallenge(edited, SEED, 5)).toBeNull()
+  })
+
+  it('rejects a hand-built plaintext payload (the old spoofable format)', () => {
+    expect(decodeChallenge('100.100.100.100.100', SEED, 5)).toBeNull()
+  })
+
+  it('rejects garbage, empty, and missing tokens', () => {
+    expect(decodeChallenge('!!!not-base64!!!', SEED, 5)).toBeNull()
+    expect(decodeChallenge('', SEED, 5)).toBeNull()
+    expect(decodeChallenge(null, SEED, 5)).toBeNull()
+    expect(decodeChallenge(undefined, SEED, 5)).toBeNull()
+  })
+
+  it('rejects a valid token of the wrong round count', () => {
+    expect(decodeChallenge(encodeChallenge([1, 2, 3], SEED), SEED, 5)).toBeNull()
+  })
+
+  it('tokens stay URL-safe (no +, /, =, or dots to trip query parsing)', () => {
+    const token = encodeChallenge(BASES, SEED)
+    expect(token).toMatch(/^[A-Za-z0-9_-]+$/)
+  })
+})
+
+describe('versus seed lock (#28)', () => {
+  it('namespaces the lock under the seed', () => {
+    expect(versusLockKey('abc123')).toBe('terratap:versus:abc123')
+  })
+
+  it('a versus run locks after one scored attempt', () => {
+    const run = buildVersusRun('abc123')
+    expect(run.lockKey).toBe(versusLockKey('abc123'))
+  })
+})
+
 describe('challenge context (#27)', () => {
   it('banner names the score to beat', () => {
     expect(challengeBannerText(54)).toContain('54')
@@ -121,9 +175,11 @@ describe('challenge context (#27)', () => {
 })
 
 describe('challenge link', () => {
-  it('builds a URL carrying the seed and encoded bases', () => {
+  it('builds a URL carrying the seed and a decodable token', () => {
     const url = challengeUrl('https://terratap.example', 'abc123', [100, 0, 55, 88, 72])
-    expect(url).toBe('https://terratap.example/versus?seed=abc123&s=100.0.55.88.72')
+    expect(url).toMatch(/^https:\/\/terratap\.example\/versus\?seed=abc123&s=[A-Za-z0-9_-]+$/)
+    const token = new URL(url).searchParams.get('s')!
+    expect(decodeChallenge(token, 'abc123', 5)).toEqual([100, 0, 55, 88, 72])
   })
 
   it('share text includes the total and the link', () => {
