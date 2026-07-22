@@ -61,16 +61,54 @@ export function countryFeatureAtSync(
 
 /** Name of the country containing the point, or null (ocean / uncovered). */
 export function countryAtSync(point: LatLng, countries: CountryCollection): string | null {
-  return countryFeatureAtSync(point, countries)?.properties.name ?? null
+  const name = countryFeatureAtSync(point, countries)?.properties.name
+  return name ? commonCountryName(name) : null
+}
+
+/**
+ * Natural Earth uses formal names for some countries; the game (and the quiz
+ * data) uses everyday short names. Normalize so in-game feedback reads
+ * naturally and matches quiz labels ("South Korea", not "Republic of Korea").
+ */
+const COMMON_NAMES: Record<string, string> = {
+  'Russian Federation': 'Russia',
+  'Republic of Korea': 'South Korea',
+  "Dem. Rep. Korea": 'North Korea',
+  'Czech Republic': 'Czechia',
+  'Democratic Republic of the Congo': 'DR Congo',
+  'Republic of the Congo': 'Congo',
+  'Lao PDR': 'Laos',
+  'Brunei Darussalam': 'Brunei',
+  'Syrian Arab Republic': 'Syria',
+  'Iran (Islamic Republic of)': 'Iran',
+  'Islamic Republic of Iran': 'Iran',
+  "Côte d'Ivoire": 'Ivory Coast',
+  'Bolivia (Plurinational State of)': 'Bolivia',
+  'Venezuela (Bolivarian Republic of)': 'Venezuela',
+  'United Republic of Tanzania': 'Tanzania',
+  'Viet Nam': 'Vietnam',
+  'Republic of Moldova': 'Moldova',
+  'The former Yugoslav Republic of Macedonia': 'North Macedonia',
+  'Kingdom of eSwatini': 'Eswatini',
+}
+
+/** Everyday display name for a dataset country name. */
+export function commonCountryName(name: string): string {
+  return COMMON_NAMES[name] ?? name
 }
 
 let dataPromise: Promise<CountryCollection> | null = null
 
 /** Lazy-load the country data (kept out of the initial bundle). */
 function loadCountries(): Promise<CountryCollection> {
-  dataPromise ??= import('./data/countries-110m.json').then(
-    (m) => (m.default ?? m) as unknown as CountryCollection,
-  )
+  dataPromise ??= import('./data/countries-110m.json').then((m) => {
+    const data = (m.default ?? m) as unknown as CountryCollection
+    // Normalize names once at load so every consumer sees everyday names.
+    for (const f of data.features) {
+      f.properties.name = commonCountryName(f.properties.name)
+    }
+    return data
+  })
   return dataPromise
 }
 
