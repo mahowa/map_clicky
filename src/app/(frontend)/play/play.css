@@ -171,6 +171,25 @@
   color: #94a3b8;
   font-size: 15px;
 }
+.gg-versus-banner {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 4px 0 10px;
+}
+.gg-versus-win {
+  color: #34d399;
+}
+.gg-versus-lose {
+  color: #f87171;
+}
+.gg-versus-tie {
+  color: #fbbf24;
+}
+.gg-opp {
+  font-size: 13px;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
 .gg-clue {
   margin: 10px 0 0;
   font-size: 15px;

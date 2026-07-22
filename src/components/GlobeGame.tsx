@@ -15,6 +15,13 @@ import {
   type CountryGeometry,
 } from '@/lib/country-lookup'
 import { SPEED_ROUND_SECONDS, expiryAction, formatDuration } from '@/lib/speed'
+import {
+  challengeUrl,
+  formatChallengeShare,
+  pointsFromBase,
+  totalFromBases,
+  versusOutcome,
+} from '@/lib/versus'
 
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
@@ -136,7 +143,14 @@ const toSavedRound = (r: RoundResult): SavedRound => ({
   distanceKm: r.distanceKm,
 })
 
-export default function GlobeGame({ run }: { run: GameRun }) {
+export default function GlobeGame({
+  run,
+  opponentBases,
+}: {
+  run: GameRun
+  /** Versus (#5): challenger's per-round base scores parsed from the URL. */
+  opponentBases?: number[] | null
+}) {
   const [index, setIndex] = useState(0)
   const [phase, setPhase] = useState<Phase>('guessing')
   const [guess, setGuess] = useState<LatLng | null>(null)
@@ -463,6 +477,28 @@ export default function GlobeGame({ run }: { run: GameRun }) {
       }
     }
 
+    // Versus (#5): compare against the challenger's linked scores and offer a
+    // challenge link carrying this run's seed + our bases.
+    const isVersus = !!run.versusSeed
+    const theirTotal =
+      isVersus && opponentBases ? totalFromBases(opponentBases, run.rounds) : null
+    const outcome = theirTotal !== null ? versusOutcome(finalTotal, theirTotal) : null
+    const onChallenge = async () => {
+      if (!run.versusSeed) return
+      const url = challengeUrl(
+        window.location.origin,
+        run.versusSeed,
+        summary.map((s) => s.base),
+      )
+      try {
+        await navigator.clipboard.writeText(formatChallengeShare(finalTotal, url))
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } catch {
+        setCopied(false)
+      }
+    }
+
     return (
       <div className="gg-done">
         <h1>{playedEarlier ? "Today's result" : 'Final score'}</h1>
@@ -472,6 +508,9 @@ export default function GlobeGame({ run }: { run: GameRun }) {
         </p>
         <p className="gg-verdict">{verdict}</p>
         {run.timed && <p className="gg-time-total">Total time: {formatDuration(elapsedMs)}</p>}
+        {outcome && (
+          <p className={`gg-versus-banner gg-versus-${outcome.result}`}>{outcome.message}</p>
+        )}
         <ul className="gg-summary">
           {summary.map((r, i) => (
             <li key={i}>
@@ -484,6 +523,11 @@ export default function GlobeGame({ run }: { run: GameRun }) {
                   {r.base}/100 ×{r.multiplier}
                 </span>
                 <span className="gg-pts">+{r.points}</span>
+                {opponentBases && run.rounds[i] && (
+                  <span className="gg-opp">
+                    them: +{pointsFromBase(opponentBases[i], run.rounds[i])}
+                  </span>
+                )}
               </div>
               {run.rounds[i]?.fact && (
                 <p className="gg-summary-fact">{run.rounds[i].fact}</p>
@@ -492,6 +536,16 @@ export default function GlobeGame({ run }: { run: GameRun }) {
           ))}
         </ul>
 
+        {isVersus && (
+          <div className="gg-share">
+            <button className="gg-btn gg-btn-primary" onClick={onChallenge}>
+              {copied ? 'Copied!' : outcome ? 'Rechallenge' : 'Challenge a friend'}
+            </button>
+            <p className="gg-comeback">
+              Send the link — they play the exact same five places.
+            </p>
+          </div>
+        )}
         {isDaily ? (
           <div className="gg-share">
             <pre className="gg-share-text">{shareText}</pre>
@@ -501,9 +555,11 @@ export default function GlobeGame({ run }: { run: GameRun }) {
             <p className="gg-comeback">Come back tomorrow for a new daily.</p>
           </div>
         ) : (
-          <button className="gg-btn gg-btn-primary" onClick={restart}>
-            Play again
-          </button>
+          !isVersus && (
+            <button className="gg-btn gg-btn-primary" onClick={restart}>
+              Play again
+            </button>
+          )
         )}
       </div>
     )
