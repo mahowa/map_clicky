@@ -90,10 +90,13 @@ export function formatRunShare(
   total: number,
   url: string,
   timeText?: string | null,
+  /** Streak brag line, e.g. "🔥 3-day streak" (#32). */
+  streakLine?: string | null,
 ): string {
   const line = bases.map((b) => `${b}${scoreEmoji(b)}`).join(' ')
   const time = timeText ? `\nTime: ${timeText}` : ''
-  return `${heading}\n${line}\nFinal score: ${total}${time}\n${url}`
+  const streak = streakLine ? `\n${streakLine}` : ''
+  return `${heading}\n${line}\nFinal score: ${total}${time}${streak}\n${url}`
 }
 
 /**

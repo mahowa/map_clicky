@@ -24,6 +24,7 @@ import {
   showStartGate,
 } from '@/lib/speed'
 import { legacyDailyLockKey } from '@/lib/locks'
+import { loadStats, streakText, type DailyStats } from '@/lib/stats'
 import {
   clearProgress,
   loadProgress,
@@ -566,6 +567,16 @@ export default function GlobeGame({
     [finalTotal, maxPossible],
   )
 
+  // Streaks & stats (#32): aggregated from this browser's saved results for
+  // the dated modes. `saved` in the deps recomputes after today's run is
+  // written, so the fresh game counts itself.
+  const statsMode: 'daily' | 'speed' | null =
+    run.mode === 'daily' ? 'daily' : run.timed && run.lockKey ? 'speed' : null
+  const stats: DailyStats | null = useMemo(
+    () => (phase === 'done' && statsMode ? loadStats(statsMode, run.dateKey) : null),
+    [phase, statsMode, run.dateKey, saved], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
   if (phase === 'done') {
     // Render from saved data when present (prior play), else from the live run.
     const summary: SavedRound[] = saved ? saved.rounds : results.map(toSavedRound)
@@ -579,6 +590,7 @@ export default function GlobeGame({
       finalTotal,
       shareUrlFromLocation(),
       run.timed && timedMs > 0 ? formatDuration(timedMs) : null,
+      stats ? streakText(stats.currentStreak) : null,
     )
 
     const onShare = async () => {
@@ -644,6 +656,26 @@ export default function GlobeGame({
         )}
         {outcome && (
           <p className={`gg-versus-banner gg-versus-${outcome.result}`}>{outcome.message}</p>
+        )}
+        {/* Wordle-style stats strip for the dated modes (#32). */}
+        {stats && stats.played > 0 && (
+          <div className="gg-stats">
+            <span className="gg-stat">
+              <strong>{stats.currentStreak}</strong> streak 🔥
+            </span>
+            <span className="gg-stat">
+              <strong>{stats.maxStreak}</strong> best streak
+            </span>
+            <span className="gg-stat">
+              <strong>{stats.played}</strong> played
+            </span>
+            <span className="gg-stat">
+              <strong>{stats.best}</strong> best
+            </span>
+            <span className="gg-stat">
+              <strong>{stats.average}</strong> avg
+            </span>
+          </div>
         )}
         <ul className="gg-summary">
           {summary.map((r, i) => (
