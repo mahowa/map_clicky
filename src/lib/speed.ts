@@ -64,6 +64,24 @@ export function expiryAction(hasGuess: boolean): 'submit' | 'zero' {
   return hasGuess ? 'submit' : 'zero'
 }
 
+/**
+ * Whether a run still needs its explicit "Start run" gate (issue #24).
+ *
+ * The clock must never start without the player's say-so: arming it on page
+ * load burned round 1 while tiles were still streaming in — fatal for a
+ * once-daily run. Timed runs therefore hold on a gate (place name hidden,
+ * globe clicks ignored) until the player presses Start; untimed runs have no
+ * clock and never gate.
+ */
+export function showStartGate(timed: boolean, started: boolean): boolean {
+  return timed && !started
+}
+
+/** Initial value of the "started" flag: only timed runs wait for the gate. */
+export function initialStarted(timed: boolean): boolean {
+  return !timed
+}
+
 /** "83459ms" -> "1:23.4" (m:ss.t). Clamps negatives to 0:00.0. */
 export function formatDuration(ms: number): string {
   const clamped = Math.max(0, ms)

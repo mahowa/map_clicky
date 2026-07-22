@@ -5,6 +5,8 @@ import {
   buildSpeedRun,
   expiryAction,
   formatDuration,
+  initialStarted,
+  showStartGate,
   speedLockKey,
   speedPool,
 } from '@/lib/speed'
@@ -63,6 +65,31 @@ describe('expiryAction', () => {
   })
   it('scores a zero when no guess was placed', () => {
     expect(expiryAction(false)).toBe('zero')
+  })
+})
+
+describe('start gate (#24)', () => {
+  it('holds a timed run behind the gate until the player starts it', () => {
+    expect(showStartGate(true, false)).toBe(true)
+  })
+
+  it('releases the gate once started', () => {
+    expect(showStartGate(true, true)).toBe(false)
+  })
+
+  it('never gates untimed runs', () => {
+    expect(showStartGate(false, false)).toBe(false)
+    expect(showStartGate(false, true)).toBe(false)
+  })
+
+  it('timed runs mount un-started; untimed runs mount started', () => {
+    expect(initialStarted(true)).toBe(false)
+    expect(initialStarted(false)).toBe(true)
+  })
+
+  it('a freshly-built speed run is timed, so it will gate on mount', () => {
+    const run = buildSpeedRun('2026-07-22')
+    expect(showStartGate(!!run.timed, initialStarted(!!run.timed))).toBe(true)
   })
 })
 

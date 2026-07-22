@@ -15,7 +15,13 @@ import {
   describeMiss,
   type CountryGeometry,
 } from '@/lib/country-lookup'
-import { SPEED_ROUND_SECONDS, expiryAction, formatDuration } from '@/lib/speed'
+import {
+  SPEED_ROUND_SECONDS,
+  expiryAction,
+  formatDuration,
+  initialStarted,
+  showStartGate,
+} from '@/lib/speed'
 import { legacyDailyLockKey } from '@/lib/locks'
 import { otherGameLinks, runKind } from '@/lib/nav'
 import {
@@ -162,6 +168,9 @@ export default function GlobeGame({
   // Speed run (#9): ms left on the current round's clock, and total play time.
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
+  // Timed runs hold on an explicit "Start run" gate so the clock never starts
+  // on page load while tiles are still streaming in (#24).
+  const [started, setStarted] = useState(() => initialStarted(!!run.timed))
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
@@ -194,9 +203,11 @@ export default function GlobeGame({
   const handleGlobeClick = useCallback(
     ({ lat, lng }: { lat: number; lng: number }) => {
       if (phase !== 'guessing') return
+      // Behind the start gate the round hasn't begun — ignore globe taps (#24).
+      if (showStartGate(!!run.timed, started)) return
       setGuess({ lat, lng })
     },
-    [phase],
+    [phase, run.timed, started],
   )
   // Keep the map's click handler pointing at the latest closure (avoids stale phase).
   useEffect(() => {
@@ -393,9 +404,10 @@ export default function GlobeGame({
     }
   }, [guess, submitGuess, timeoutRound])
 
-  // Arm the countdown at each timed round's start; tick every 100ms; act on expiry.
+  // Arm the countdown at each timed round's start; tick every 100ms; act on
+  // expiry. Never arms before the player passes the start gate (#24).
   useEffect(() => {
-    if (!run.timed || phase !== 'guessing' || !ready || !round) return
+    if (!run.timed || !started || phase !== 'guessing' || !ready || !round) return
     roundStartRef.current = Date.now()
     const deadline = Date.now() + SPEED_ROUND_SECONDS * 1000
     setRemainingMs(SPEED_ROUND_SECONDS * 1000)
@@ -410,7 +422,7 @@ export default function GlobeGame({
       }
     }, 100)
     return () => window.clearInterval(id)
-  }, [run.timed, phase, ready, round])
+  }, [run.timed, started, phase, ready, round])
 
   const next = useCallback(() => {
     if (index + 1 >= run.rounds.length) {
@@ -428,8 +440,9 @@ export default function GlobeGame({
     setResults([])
     setElapsedMs(0)
     setRemainingMs(null)
+    setStarted(initialStarted(!!run.timed))
     setPhase('guessing')
-  }, [])
+  }, [run.timed])
 
   // Persist a freshly-completed lockable run (daily / speed) to the browser.
   useEffect(() => {
@@ -595,7 +608,27 @@ export default function GlobeGame({
           </span>
         </div>
 
-        {phase === 'guessing' && round && (
+        {/* Start gate (#24): the clock — and the round's place name — hold until
+            the player is ready. Round 1 must never burn while tiles load. */}
+        {phase === 'guessing' && round && showStartGate(!!run.timed, started) && (
+          <div className="gg-panel">
+            <div className="gg-prompt">
+              {run.rounds.length} places · {SPEED_ROUND_SECONDS}s each
+            </div>
+            <div className="gg-hint">
+              The clock starts when you do. Ready?
+            </div>
+            <button
+              className="gg-btn gg-btn-primary"
+              disabled={!ready}
+              onClick={() => setStarted(true)}
+            >
+              {ready ? 'Start run' : 'Loading globe…'}
+            </button>
+          </div>
+        )}
+
+        {phase === 'guessing' && round && !showStartGate(!!run.timed, started) && (
           <div className="gg-panel">
             {run.timed && remainingMs !== null && (
               <div className={`gg-timer${remainingMs < 5000 ? ' gg-timer-low' : ''}`}>
