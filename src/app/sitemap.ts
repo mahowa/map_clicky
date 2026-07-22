@@ -8,6 +8,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/play`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/quizzes`, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${SITE_URL}/speed`, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${SITE_URL}/history`, changeFrequency: 'monthly', priority: 0.8 },
     ...QUIZZES.map((q) => ({
       url: `${SITE_URL}/quiz/${q.slug}`,
       changeFrequency: 'monthly' as const,
