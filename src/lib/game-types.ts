@@ -8,6 +8,11 @@ export type Round = {
   lng: number
   difficulty: Difficulty
   fact: string | null
+  /**
+   * History mode (#4): a description shown INSTEAD of the name while guessing —
+   * the player works out where it refers to. Reveal shows the name as usual.
+   */
+  clue?: string | null
 }
 
 /** A daily-set round row as stored, carrying the optional history blurb. */
@@ -27,4 +32,6 @@ export type GameRun = {
   dateKey: string
   /** Timed "speed run": each round is played against a countdown (issue #9). */
   timed?: boolean
+  /** Show place labels on the globe (history mode: the map isn't the puzzle). */
+  labeled?: boolean
 }

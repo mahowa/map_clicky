@@ -21,22 +21,39 @@ const ANSWER_COLOR = '#34d399' // emerald-400
 
 // ESRI World Imagery: free, key-less, label-free satellite tiles with deep zoom
 // (sub-meter to ~z19). No place names → fair guessing. Attribution is required
-// and shown via MapLibre's attribution control.
-const SATELLITE_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    satellite: {
+// and shown via MapLibre's attribution control. History mode (#4) overlays
+// Esri's boundaries+places reference tiles — there the puzzle is the history,
+// not the unlabeled map.
+function buildMapStyle(labeled: boolean): StyleSpecification {
+  const style: StyleSpecification = {
+    version: 8,
+    sources: {
+      satellite: {
+        type: 'raster',
+        tiles: [
+          'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution:
+          'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+      },
+    },
+    layers: [{ id: 'satellite', type: 'raster', source: 'satellite' }],
+  }
+  if (labeled) {
+    style.sources.labels = {
       type: 'raster',
       tiles: [
-        'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        'https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
       ],
       tileSize: 256,
       maxzoom: 19,
-      attribution:
-        'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-    },
-  },
-  layers: [{ id: 'satellite', type: 'raster', source: 'satellite' }],
+      attribution: 'Labels © Esri',
+    }
+    style.layers.push({ id: 'labels', type: 'raster', source: 'labels' })
+  }
+  return style
 }
 
 const LINE_SOURCE = 'gg-line'
@@ -178,7 +195,7 @@ export default function GlobeGame({ run }: { run: GameRun }) {
       if (cancelled || !wrapRef.current) return
       map = new Map({
         container: wrapRef.current,
-        style: SATELLITE_STYLE,
+        style: buildMapStyle(!!run.labeled),
         center: GLOBE_VIEW.center,
         zoom: GLOBE_VIEW.zoom,
         attributionControl: { compact: true },
@@ -204,7 +221,7 @@ export default function GlobeGame({ run }: { run: GameRun }) {
       map?.remove()
       mapRef.current = null
     }
-  }, [])
+  }, [run.labeled])
 
   // Draw guess/answer markers + the connecting line, and frame the camera.
   useEffect(() => {
@@ -513,14 +530,31 @@ export default function GlobeGame({ run }: { run: GameRun }) {
                 {Math.ceil(remainingMs / 1000)}s
               </div>
             )}
-            <div className="gg-prompt">
-              Find: <strong>{round.country ? `${round.name}, ${round.country}` : round.name}</strong>
-              <span className={`gg-diff gg-diff-${round.difficulty}`}>
-                {round.difficulty} ×{DIFFICULTY_MULTIPLIER[round.difficulty]}
-              </span>
-            </div>
+            {round.clue ? (
+              <>
+                <div className="gg-prompt">
+                  Where did this happen?
+                  <span className={`gg-diff gg-diff-${round.difficulty}`}>
+                    {round.difficulty} ×{DIFFICULTY_MULTIPLIER[round.difficulty]}
+                  </span>
+                </div>
+                <p className="gg-clue">{round.clue}</p>
+              </>
+            ) : (
+              <div className="gg-prompt">
+                Find:{' '}
+                <strong>{round.country ? `${round.name}, ${round.country}` : round.name}</strong>
+                <span className={`gg-diff gg-diff-${round.difficulty}`}>
+                  {round.difficulty} ×{DIFFICULTY_MULTIPLIER[round.difficulty]}
+                </span>
+              </div>
+            )}
             <div className="gg-hint">
-              {guess ? 'Tap again to adjust, then submit.' : 'Tap the globe where you think it is.'}
+              {guess
+                ? 'Tap again to adjust, then submit.'
+                : round.clue
+                  ? 'Tap the globe where you think this took place.'
+                  : 'Tap the globe where you think it is.'}
             </div>
             <button className="gg-btn gg-btn-primary" disabled={!guess} onClick={submitGuess}>
               Submit guess

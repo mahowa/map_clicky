@@ -171,6 +171,14 @@
   color: #94a3b8;
   font-size: 15px;
 }
+.gg-clue {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #e2e8f0;
+  border-left: 3px solid rgba(52, 211, 153, 0.6);
+  padding-left: 12px;
+}
 .gg-timer {
   font-size: 28px;
   font-weight: 900;
