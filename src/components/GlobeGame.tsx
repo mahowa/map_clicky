@@ -24,6 +24,12 @@ import {
   showStartGate,
 } from '@/lib/speed'
 import { legacyDailyLockKey } from '@/lib/locks'
+import {
+  clearProgress,
+  loadProgress,
+  resumePlan,
+  saveProgress,
+} from '@/lib/progress'
 import { otherGameLinks, runKind } from '@/lib/nav'
 import {
   challengeUrl,
@@ -181,7 +187,9 @@ export default function GlobeGame({
   const roundStartRef = useRef<number>(0)
 
   // On mount, if this lockable run was already played in this browser
-  // (daily or speed run, #21), jump straight to the saved results.
+  // (daily or speed run, #21), jump straight to the saved results. Otherwise
+  // restore any in-flight progress so a refresh resumes — not restarts — the
+  // day's attempt (#26).
   useEffect(() => {
     if (!run.lockKey) return
     const prior = loadSaved(
@@ -192,8 +200,48 @@ export default function GlobeGame({
       setSaved(prior)
       setPlayedEarlier(true)
       setPhase('done')
+      return
     }
-  }, [run.lockKey, run.mode, run.dateKey])
+    const progress = loadProgress(run.lockKey, run.dateKey, run.rounds.length)
+    if (!progress || (progress.rounds.length === 0 && progress.armedIndex === null)) return
+    const plan = resumePlan(progress, !!run.timed, run.rounds.length)
+    const restored: RoundResult[] = progress.rounds.map((s, i) => ({
+      round: run.rounds[i],
+      guess: null,
+      distanceKm: s.distanceKm,
+      points: s.points,
+      base: s.base,
+      multiplier: s.multiplier,
+      reaction: pickReaction(s.base),
+      guessCountry: null,
+      answerCountry: null,
+      answerRegion: null,
+    }))
+    // A timed round whose clock was running at unload is forfeited — a refresh
+    // must not grant a fresh clock for a place the player already saw.
+    if (plan.forfeitArmed) {
+      const armed = run.rounds[progress.rounds.length]
+      restored.push({
+        round: armed,
+        guess: null,
+        distanceKm: null,
+        points: 0,
+        base: 0,
+        multiplier: DIFFICULTY_MULTIPLIER[armed.difficulty],
+        reaction: '⏰ The clock was running when the page went away.',
+        guessCountry: null,
+        answerCountry: null,
+        answerRegion: null,
+      })
+    }
+    setResults(restored)
+    setElapsedMs(progress.elapsedMs)
+    if (plan.finished) {
+      setPhase('done')
+    } else {
+      setIndex(plan.resumeIndex)
+    }
+  }, [run.lockKey, run.mode, run.dateKey, run.timed, run.rounds])
 
   const round = run.rounds[index]
   const answer: LatLng | null = useMemo(
@@ -415,6 +463,16 @@ export default function GlobeGame({
   useEffect(() => {
     if (!run.timed || !started || phase !== 'guessing' || !ready || !round) return
     roundStartRef.current = Date.now()
+    // Record the armed round: if the page goes away mid-clock, restore scores
+    // it zero instead of granting a fresh clock for a seen place (#26).
+    if (run.lockKey) {
+      saveProgress(run.lockKey, {
+        dateKey: run.dateKey,
+        rounds: results.map(toSavedRound),
+        elapsedMs,
+        armedIndex: index,
+      })
+    }
     const deadline = Date.now() + SPEED_ROUND_SECONDS * 1000
     setRemainingMs(SPEED_ROUND_SECONDS * 1000)
     const id = window.setInterval(() => {
@@ -428,7 +486,7 @@ export default function GlobeGame({
       }
     }, 100)
     return () => window.clearInterval(id)
-  }, [run.timed, started, phase, ready, round])
+  }, [run.timed, run.lockKey, run.dateKey, started, phase, ready, round, index, results, elapsedMs])
 
   const next = useCallback(() => {
     if (index + 1 >= run.rounds.length) {
@@ -450,6 +508,19 @@ export default function GlobeGame({
     setPhase('guessing')
   }, [run.timed])
 
+  // Persist in-flight progress after each completed round, so a refresh
+  // resumes the run instead of restarting the seed (#26).
+  useEffect(() => {
+    if (!run.lockKey || phase === 'done' || playedEarlier || saved) return
+    if (results.length === 0) return
+    saveProgress(run.lockKey, {
+      dateKey: run.dateKey,
+      rounds: results.map(toSavedRound),
+      elapsedMs,
+      armedIndex: null,
+    })
+  }, [run.lockKey, run.dateKey, phase, playedEarlier, saved, results, elapsedMs])
+
   // Persist a freshly-completed lockable run (daily / speed) to the browser.
   useEffect(() => {
     if (phase !== 'done' || !run.lockKey || playedEarlier || saved) return
@@ -460,6 +531,7 @@ export default function GlobeGame({
       rounds: results.map(toSavedRound),
     }
     saveLocked(data, run.lockKey)
+    clearProgress(run.lockKey)
     setSaved(data)
   }, [phase, run.lockKey, run.dateKey, run.rounds.length, playedEarlier, saved, results])
 
