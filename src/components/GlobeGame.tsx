@@ -9,6 +9,14 @@ import type { GameRun, Round } from '@/lib/game-types'
 import { formatRunShare, sharePlan, shareHeading, shareUrlFromLocation } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
 import { cameraActionFor, initialGlobeZoom, pairBounds } from '@/lib/camera'
+import {
+  KEYBOARD_HELP,
+  describePlacement,
+  describeReveal,
+  isPlaceGuessKey,
+  prefersReducedMotion,
+  revealDuration,
+} from '@/lib/a11y'
 import { collapseAttribution } from '@/lib/attribution'
 import {
   countryAt,
@@ -188,6 +196,8 @@ export default function GlobeGame({
   // Timed runs hold on an explicit "Start run" gate so the clock never starts
   // on page load while tiles are still streaming in (#24).
   const [started, setStarted] = useState(() => initialStarted(!!run.timed))
+  // Polite live region narrating placements and reveals for screen readers (#30).
+  const [announcement, setAnnouncement] = useState('')
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
@@ -273,6 +283,17 @@ export default function GlobeGame({
     clickRef.current = handleGlobeClick
   }, [handleGlobeClick])
 
+  // Keyboard placement (#30): Enter drops the guess at the view center and
+  // narrates where it landed. Same ref pattern as clickRef.
+  const kbPlaceRef = useRef<(p: LatLng) => void>(() => {})
+  useEffect(() => {
+    kbPlaceRef.current = (p: LatLng) => {
+      if (phase !== 'guessing' || showStartGate(!!run.timed, started)) return
+      setGuess(p)
+      void countryAt(p).then((country) => setAnnouncement(describePlacement(country)))
+    }
+  }, [phase, run.timed, started])
+
   // Initialize the MapLibre globe once. Dynamic import keeps WebGL/window off SSR.
   useEffect(() => {
     if (!wrapRef.current) return
@@ -308,6 +329,16 @@ export default function GlobeGame({
         collapseAttribution(wrapRef.current)
       })
       map.on('click', (e) => clickRef.current({ lng: e.lngLat.lng, lat: e.lngLat.lat }))
+      // Keyboard play (#30): MapLibre's canvas is focusable with built-in
+      // arrow/zoom navigation; Enter places the guess at the view center.
+      const canvas = map.getCanvas()
+      canvas.setAttribute('aria-describedby', 'gg-kb-help')
+      canvas.addEventListener('keydown', (e) => {
+        if (!isPlaceGuessKey(e.key) || !mapRef.current) return
+        e.preventDefault()
+        const c = mapRef.current.getCenter()
+        kbPlaceRef.current({ lat: c.lat, lng: c.lng })
+      })
     })
     const el = wrapRef.current
     const ro = new ResizeObserver(() => mapRef.current?.resize())
@@ -405,7 +436,12 @@ export default function GlobeGame({
     // Camera: frame the reveal pair, otherwise stay put — new rounds keep the
     // player's current view instead of zooming back out to the full globe (#7).
     if (cameraActionFor(phase, guess, answer) === 'fit-pair' && guess && answer) {
-      map.fitBounds(pairBounds(guess, answer), { padding: 120, maxZoom: 5, duration: 900 })
+      map.fitBounds(pairBounds(guess, answer), {
+        padding: 120,
+        maxZoom: 5,
+        // Honor prefers-reduced-motion: jump instead of flying (#30).
+        duration: revealDuration(prefersReducedMotion()),
+      })
     }
   }, [ready, guess, phase, answer, results])
 
@@ -437,6 +473,7 @@ export default function GlobeGame({
         answerRegion,
       },
     ])
+    setAnnouncement(describeReveal(round.name, s.base, s.points, s.distanceKm))
     setPhase('revealed')
   }, [guess, round, answer, phase, run.timed])
 
@@ -462,6 +499,7 @@ export default function GlobeGame({
         answerRegion: answerFeature?.geometry ?? null,
       },
     ])
+    setAnnouncement(describeReveal(round.name, 0, 0, null))
     setPhase('revealed')
   }, [round, answer, phase])
 
@@ -759,6 +797,15 @@ export default function GlobeGame({
     <div className="gg-root">
       <div className="gg-globe" ref={wrapRef}>
         {!ready && <div className="gg-loading">Loading globe…</div>}
+        {/* Crosshair marking where Enter will place the guess; visible while
+            the map has keyboard focus (#30). */}
+        <div className="gg-crosshair" aria-hidden="true" />
+      </div>
+      <p id="gg-kb-help" className="gg-sr-only">
+        {KEYBOARD_HELP}
+      </p>
+      <div className="gg-sr-only" role="status" aria-live="polite">
+        {announcement}
       </div>
 
       <div className="gg-hud">
