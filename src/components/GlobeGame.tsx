@@ -604,7 +604,13 @@ export default function GlobeGame({
 
     return (
       <div className="gg-done">
-        <h1>{playedEarlier ? "Today's result" : 'Final score'}</h1>
+        <h1>
+          {playedEarlier
+            ? isVersus
+              ? 'Your result for this challenge'
+              : "Today's result"
+            : 'Final score'}
+        </h1>
         <p className="gg-total">
           {finalTotal}
           <span className="gg-outof"> / {maxPossible}</span>
