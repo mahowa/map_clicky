@@ -25,12 +25,12 @@ async function run() {
     await payload.create({
       collection: 'users',
       data: {
-        email: 'admin@mapclippy.test',
+        email: 'admin@terratap.test',
         password: 'changeme123',
         displayName: 'Admin',
       },
     })
-    payload.logger.info('Created admin user admin@mapclippy.test / changeme123')
+    payload.logger.info('Created admin user admin@terratap.test / changeme123')
   }
 
   // Locations

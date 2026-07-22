@@ -10,7 +10,7 @@ export default async function HomePage() {
     <div className="mc-home">
       <div className="mc-hero">
         <h1 className="mc-logo">
-          Map<span>Clippy</span>
+          Terra<span>Tap</span>
         </h1>
         <p className="mc-tag">
           Find the world on a 3D globe. Race the clock, then battle head-to-head.

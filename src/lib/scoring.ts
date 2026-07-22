@@ -1,5 +1,5 @@
 /**
- * Shared scoring logic for MapClippy.
+ * Shared scoring logic for Terra Tap.
  *
  * This module is intentionally pure (no DB, no React, no Node-only APIs) so the
  * exact same code can run in:
