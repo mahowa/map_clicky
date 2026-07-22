@@ -9,6 +9,7 @@ import type { GameRun, Round } from '@/lib/game-types'
 import { formatDailyShare, playUrlFromLocation } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
 import { cameraActionFor, pairBounds } from '@/lib/camera'
+import { collapseAttribution } from '@/lib/attribution'
 import {
   countryAt,
   countryFeatureAt,
@@ -237,7 +238,12 @@ export default function GlobeGame({
         // Re-apply after the projection switch so the start view is a full globe.
         map?.jumpTo(GLOBE_VIEW)
       })
-      map.on('load', () => setReady(true))
+      map.on('load', () => {
+        setReady(true)
+        // Start the attribution collapsed to its ⓘ toggle — expanded it covers
+        // the Submit button on phones (#25).
+        collapseAttribution(wrapRef.current)
+      })
       map.on('click', (e) => clickRef.current({ lng: e.lngLat.lng, lat: e.lngLat.lat }))
     })
     const el = wrapRef.current

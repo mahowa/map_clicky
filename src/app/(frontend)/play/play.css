@@ -402,4 +402,11 @@
   .gg-panel {
     margin-bottom: 12px;
   }
+  /* Attribution lives at the top edge on phones: at the bottom it stacked on
+     the Submit button (the control's z-index sits above the HUD card, #25).
+     Below the round/score row, clear of every control. */
+  .gg-globe .maplibregl-ctrl-bottom-right {
+    bottom: auto;
+    top: 40px;
+  }
 }
