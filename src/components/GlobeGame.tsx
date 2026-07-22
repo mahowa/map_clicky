@@ -8,7 +8,12 @@ import type { GameRun, Round } from '@/lib/game-types'
 import { formatDailyShare } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
 import { cameraActionFor, pairBounds } from '@/lib/camera'
-import { countryAt, describeMiss } from '@/lib/country-lookup'
+import {
+  countryAt,
+  countryFeatureAt,
+  describeMiss,
+  type CountryGeometry,
+} from '@/lib/country-lookup'
 
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
@@ -34,6 +39,7 @@ const SATELLITE_STYLE: StyleSpecification = {
 }
 
 const LINE_SOURCE = 'gg-line'
+const REGION_SOURCE = 'gg-region'
 
 // Neutral full-globe framing the game starts from. Applied after the globe
 // projection is active (the mercator→globe switch otherwise inflates zoom).
@@ -61,6 +67,8 @@ type RoundResult = {
   guessCountry: string | null
   /** Country containing the answer, from the same dataset so names compare cleanly. */
   answerCountry: string | null
+  /** Geometry of the answer's country, highlighted on the globe on reveal (#6). */
+  answerRegion: CountryGeometry | null
 }
 
 /** Serializable per-round result persisted to the browser for the daily lock. */
@@ -205,6 +213,37 @@ export default function GlobeGame({ run }: { run: GameRun }) {
     if (guess) add(guess, GUESS_COLOR)
     if (phase === 'revealed' && answer) add(answer, ANSWER_COLOR)
 
+    // Answer's country region: shown while revealed so the player sees how close
+    // or far they were from the right area (#6); cleared for the next round.
+    const regionGeom =
+      phase === 'revealed' ? (results[results.length - 1]?.answerRegion ?? null) : null
+    const regionData = {
+      type: 'FeatureCollection' as const,
+      features: regionGeom
+        ? [{ type: 'Feature' as const, properties: {}, geometry: regionGeom }]
+        : [],
+    }
+    const regionSrc = map.getSource(REGION_SOURCE) as
+      | { setData?: (d: unknown) => void }
+      | undefined
+    if (regionSrc?.setData) {
+      regionSrc.setData(regionData)
+    } else {
+      map.addSource(REGION_SOURCE, { type: 'geojson', data: regionData })
+      map.addLayer({
+        id: `${REGION_SOURCE}-fill`,
+        type: 'fill',
+        source: REGION_SOURCE,
+        paint: { 'fill-color': ANSWER_COLOR, 'fill-opacity': 0.15 },
+      })
+      map.addLayer({
+        id: `${REGION_SOURCE}-outline`,
+        type: 'line',
+        source: REGION_SOURCE,
+        paint: { 'line-color': ANSWER_COLOR, 'line-width': 1.5, 'line-opacity': 0.8 },
+      })
+    }
+
     const showLine = phase === 'revealed' && guess && answer
     const data = {
       type: 'FeatureCollection' as const,
@@ -242,16 +281,18 @@ export default function GlobeGame({ run }: { run: GameRun }) {
     if (cameraActionFor(phase, guess, answer) === 'fit-pair' && guess && answer) {
       map.fitBounds(pairBounds(guess, answer), { padding: 120, maxZoom: 5, duration: 900 })
     }
-  }, [ready, guess, phase, answer])
+  }, [ready, guess, phase, answer, results])
 
   const submitGuess = useCallback(async () => {
     if (!guess || !round || !answer) return
     const s = scoreRound(guess, answer, round.difficulty)
     // Both looked up in the same offline dataset so the names compare cleanly.
-    const [guessCountry, answerCountry] = await Promise.all([
+    const [guessCountry, answerFeature] = await Promise.all([
       countryAt(guess),
-      countryAt(answer),
+      countryFeatureAt(answer),
     ])
+    const answerCountry = answerFeature?.properties.name ?? null
+    const answerRegion = answerFeature?.geometry ?? null
     setResults((prev) => [
       ...prev,
       {
@@ -264,6 +305,7 @@ export default function GlobeGame({ run }: { run: GameRun }) {
         reaction: pickReaction(s.base),
         guessCountry,
         answerCountry,
+        answerRegion,
       },
     ])
     setPhase('revealed')

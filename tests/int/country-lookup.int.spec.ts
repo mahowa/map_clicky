@@ -3,6 +3,7 @@ import {
   pointInRing,
   pointInPolygon,
   countryAt,
+  countryFeatureAt,
   describeMiss,
 } from '@/lib/country-lookup'
 
@@ -62,6 +63,25 @@ describe('countryAt (real dataset)', () => {
   })
   it('returns null in the middle of the Pacific', async () => {
     expect(await countryAt({ lat: -10, lng: -140 })).toBeNull()
+  })
+})
+
+describe('countryFeatureAt', () => {
+  it('returns the full feature with drawable geometry for the reveal overlay', async () => {
+    const f = await countryFeatureAt({ lat: 48.8566, lng: 2.3522 })
+    expect(f?.properties.name).toBe('France')
+    expect(['Polygon', 'MultiPolygon']).toContain(f?.geometry.type)
+    expect(f && f.geometry.coordinates.length).toBeGreaterThan(0)
+  })
+
+  it('returns null for open ocean (no region to draw)', async () => {
+    expect(await countryFeatureAt({ lat: -10, lng: -140 })).toBeNull()
+  })
+
+  it('agrees with countryAt on the containing country', async () => {
+    const p = { lat: 35.68, lng: 139.69 } // Tokyo
+    const f = await countryFeatureAt(p)
+    expect(f?.properties.name).toBe(await countryAt(p))
   })
 })
 
