@@ -7,6 +7,7 @@ import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
 import type { GameRun, Round } from '@/lib/game-types'
 import { formatDailyShare } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
+import { cameraActionFor, pairBounds } from '@/lib/camera'
 
 const GUESS_COLOR = '#38bdf8' // sky-400
 const ANSWER_COLOR = '#34d399' // emerald-400
@@ -33,8 +34,9 @@ const SATELLITE_STYLE: StyleSpecification = {
 
 const LINE_SOURCE = 'gg-line'
 
-// Neutral full-globe framing the player starts each round from. Applied after the
-// globe projection is active (the mercator→globe switch otherwise inflates zoom).
+// Neutral full-globe framing the game starts from. Applied after the globe
+// projection is active (the mercator→globe switch otherwise inflates zoom).
+// Later rounds keep the player's current view (see cameraActionFor, issue #7).
 const GLOBE_VIEW: { center: [number, number]; zoom: number } = { center: [0, 20], zoom: 0.9 }
 
 /** A small colored dot marker element for guess/answer. */
@@ -230,19 +232,10 @@ export default function GlobeGame({ run }: { run: GameRun }) {
       })
     }
 
-    if (showLine && guess && answer) {
-      const lons = [guess.lng, answer.lng]
-      const lats = [guess.lat, answer.lat]
-      map.fitBounds(
-        [
-          [Math.min(...lons), Math.min(...lats)],
-          [Math.max(...lons), Math.max(...lats)],
-        ],
-        { padding: 120, maxZoom: 5, duration: 900 },
-      )
-    } else if (phase === 'guessing' && !guess) {
-      // New round: reset to the full-globe view so the next place must be re-found.
-      map.flyTo({ ...GLOBE_VIEW, duration: 700 })
+    // Camera: frame the reveal pair, otherwise stay put — new rounds keep the
+    // player's current view instead of zooming back out to the full globe (#7).
+    if (cameraActionFor(phase, guess, answer) === 'fit-pair' && guess && answer) {
+      map.fitBounds(pairBounds(guess, answer), { padding: 120, maxZoom: 5, duration: 900 })
     }
   }, [ready, guess, phase, answer])
 
