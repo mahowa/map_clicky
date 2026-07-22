@@ -6,7 +6,7 @@ import type { Map as MlMap, Marker as MlMarker, StyleSpecification } from 'mapli
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
 import type { GameRun, Round } from '@/lib/game-types'
-import { formatDailyShare, playUrlFromLocation } from '@/lib/share'
+import { formatRunShare, sharePlan, shareHeading, shareUrlFromLocation } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
 import { cameraActionFor, pairBounds } from '@/lib/camera'
 import { collapseAttribution } from '@/lib/attribution'
@@ -124,7 +124,13 @@ type SavedRound = {
   /** null = timed out with no guess. */
   distanceKm: number | null
 }
-type SavedDaily = { dateKey: string; total: number; rounds: SavedRound[] }
+type SavedDaily = {
+  dateKey: string
+  total: number
+  rounds: SavedRound[]
+  /** Timed runs: total play time, so replays and shares keep the real time (#31). */
+  elapsedMs?: number
+}
 
 function loadSaved(lockKey: string, legacyKey?: string): SavedDaily | null {
   if (typeof window === 'undefined' || !lockKey) return null
@@ -531,11 +537,12 @@ export default function GlobeGame({
       dateKey: run.dateKey,
       total: results.reduce((sum, r) => sum + r.points, 0),
       rounds: results.map(toSavedRound),
+      ...(run.timed ? { elapsedMs } : {}),
     }
     saveLocked(data, run.lockKey)
     clearProgress(run.lockKey)
     setSaved(data)
-  }, [phase, run.lockKey, run.dateKey, run.rounds.length, playedEarlier, saved, results])
+  }, [phase, run.lockKey, run.dateKey, run.timed, run.rounds.length, playedEarlier, saved, results, elapsedMs])
 
   const total = results.reduce((sum, r) => sum + r.points, 0)
   const lastResult = results[results.length - 1]
@@ -563,14 +570,30 @@ export default function GlobeGame({
     // Render from saved data when present (prior play), else from the live run.
     const summary: SavedRound[] = saved ? saved.rounds : results.map(toSavedRound)
     const isDaily = run.mode === 'daily'
-    const shareText = formatDailyShare(
-      run.dateKey,
+    // Every mode shares (#31): dated heading for daily/speed, titled for the
+    // rest; speed includes the run time (from the save on locked replays).
+    const timedMs = run.timed ? (saved?.elapsedMs ?? elapsedMs) : 0
+    const shareText = formatRunShare(
+      shareHeading(runKind(run), run.title, run.dateKey),
       summary.map((s) => s.base),
       finalTotal,
-      playUrlFromLocation(),
+      shareUrlFromLocation(),
+      run.timed && timedMs > 0 ? formatDuration(timedMs) : null,
     )
 
     const onShare = async () => {
+      // Native share sheet where it's the norm (touch devices); clipboard elsewhere.
+      const coarse =
+        typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches
+      if (sharePlan(typeof navigator.share === 'function', coarse) === 'native') {
+        try {
+          await navigator.share({ text: shareText })
+          return
+        } catch (err) {
+          if ((err as Error)?.name === 'AbortError') return
+          /* fall through to the clipboard */
+        }
+      }
       try {
         await navigator.clipboard.writeText(shareText)
         setCopied(true)
@@ -616,7 +639,9 @@ export default function GlobeGame({
           <span className="gg-outof"> / {maxPossible}</span>
         </p>
         <p className="gg-verdict">{verdict}</p>
-        {run.timed && <p className="gg-time-total">Total time: {formatDuration(elapsedMs)}</p>}
+        {run.timed && timedMs > 0 && (
+          <p className="gg-time-total">Total time: {formatDuration(timedMs)}</p>
+        )}
         {outcome && (
           <p className={`gg-versus-banner gg-versus-${outcome.result}`}>{outcome.message}</p>
         )}
@@ -655,13 +680,13 @@ export default function GlobeGame({
             </p>
           </div>
         )}
-        {isDaily && (
+        {!isVersus && (
           <div className="gg-share">
             <pre className="gg-share-text">{shareText}</pre>
             <button className="gg-btn gg-btn-primary" onClick={onShare}>
               {copied ? 'Copied!' : 'Share result'}
             </button>
-            <p className="gg-comeback">Come back tomorrow for a new daily.</p>
+            {isDaily && <p className="gg-comeback">Come back tomorrow for a new daily.</p>}
           </div>
         )}
         {/* Locked runs (daily, speed) never replay; versus rechallenges instead (#21). */}
