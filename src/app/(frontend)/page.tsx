@@ -19,6 +19,9 @@ export default async function HomePage() {
           <Link className="mc-cta mc-cta-primary" href="/play">
             Play the Daily
           </Link>
+          <Link className="mc-cta" href="/quizzes">
+            Pop Quizzes
+          </Link>
         </div>
         <p className="mc-note">Tap where you think each place is. Closer = more points.</p>
       </div>
