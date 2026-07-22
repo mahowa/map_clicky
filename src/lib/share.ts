@@ -54,6 +54,52 @@ export function formatDailyShare(
   total: number,
   playUrl: string = PLAY_URL,
 ): string {
+  return formatRunShare(`Terra Tap — ${formatShareDate(dateKey)}`, bases, total, playUrl)
+}
+
+/**
+ * Share URL for the page being played (#31): quiz shares link to that quiz,
+ * speed to /speed, history to /history. Falls back to the play URL on SSR.
+ */
+export function shareUrlFromLocation(): string {
+  if (typeof window === 'undefined' || !window.location?.origin) return PLAY_URL
+  return `${window.location.origin}${window.location.pathname}`
+}
+
+/**
+ * Share heading for any run (#31). Dated modes carry the date; named modes
+ * (quizzes, history) carry their title.
+ */
+export function shareHeading(
+  kind: 'daily' | 'speed' | 'versus' | 'history' | 'quiz',
+  title: string,
+  dateKey: string,
+): string {
+  if (kind === 'daily') return `Terra Tap — ${formatShareDate(dateKey)}`
+  if (kind === 'speed') return `Terra Tap Speed Run — ${formatShareDate(dateKey)}`
+  return `Terra Tap — ${title}`
+}
+
+/**
+ * Generic share block for a completed run (#31): emoji score line, total,
+ * optional run time (speed), and the link back in.
+ */
+export function formatRunShare(
+  heading: string,
+  bases: number[],
+  total: number,
+  url: string,
+  timeText?: string | null,
+): string {
   const line = bases.map((b) => `${b}${scoreEmoji(b)}`).join(' ')
-  return `Terra Tap — ${formatShareDate(dateKey)}\n${line}\nFinal score: ${total}\n${playUrl}`
+  const time = timeText ? `\nTime: ${timeText}` : ''
+  return `${heading}\n${line}\nFinal score: ${total}${time}\n${url}`
+}
+
+/**
+ * How to deliver a share (#31): the native sheet where it's the norm
+ * (touch devices with the Web Share API), the clipboard everywhere else.
+ */
+export function sharePlan(hasShareApi: boolean, coarsePointer: boolean): 'native' | 'clipboard' {
+  return hasShareApi && coarsePointer ? 'native' : 'clipboard'
 }
