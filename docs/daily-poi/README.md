@@ -1,6 +1,6 @@
 # Daily POI Wiki
 
-How map_clippy chooses and sources the five "points of interest" (POIs) that make up
+How Terra Tap chooses and sources the five "points of interest" (POIs) that make up
 each day's puzzle.
 
 This wiki documents the full pipeline, from the raw geographic data that fills the

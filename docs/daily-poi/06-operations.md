@@ -23,7 +23,7 @@ pnpm exec tsx scripts/seed.ts
 ```
 
 > `scripts/seed.ts` is for getting a fresh local DB playable fast. Default admin login is
-> `admin@mapclippy.test` / `changeme123`. It skips if locations already exist.
+> `admin@terratap.test` / `changeme123`. It skips if locations already exist.
 
 ## Daily: ingest events
 

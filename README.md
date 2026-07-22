@@ -1,6 +1,6 @@
-# Payload Blank Template
+# Terra Tap
 
-This template comes configured with the bare minimum to get started on anything you need.
+A geography game on a 3D globe: tap where you think each place is — closer means more points. Built on Next.js + Payload CMS.
 
 ## Documentation
 

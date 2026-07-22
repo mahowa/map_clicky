@@ -5,7 +5,7 @@ import type { Map as MlMap, Marker as MlMarker, StyleSpecification } from 'mapli
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { scoreRound, type LatLng, DIFFICULTY_MULTIPLIER } from '@/lib/scoring'
 import type { GameRun, Round } from '@/lib/game-types'
-import { formatDailyShare } from '@/lib/share'
+import { formatDailyShare, playUrlFromLocation } from '@/lib/share'
 import { pickReaction, pickVerdict } from '@/lib/reactions'
 import { cameraActionFor, pairBounds } from '@/lib/camera'
 import {
@@ -81,12 +81,16 @@ type SavedRound = {
 }
 type SavedDaily = { dateKey: string; total: number; rounds: SavedRound[] }
 
-const storageKey = (dateKey: string) => `mapclippy:daily:${dateKey}`
+const storageKey = (dateKey: string) => `terratap:daily:${dateKey}`
+/** Pre-rename key (issue #8) — read as a fallback so an in-flight day isn't lost. */
+const legacyStorageKey = (dateKey: string) => `mapclippy:daily:${dateKey}`
 
 function loadSavedDaily(dateKey: string): SavedDaily | null {
   if (typeof window === 'undefined' || !dateKey) return null
   try {
-    const raw = window.localStorage.getItem(storageKey(dateKey))
+    const raw =
+      window.localStorage.getItem(storageKey(dateKey)) ??
+      window.localStorage.getItem(legacyStorageKey(dateKey))
     if (!raw) return null
     const parsed = JSON.parse(raw) as SavedDaily
     return Array.isArray(parsed.rounds) ? parsed : null
@@ -364,6 +368,7 @@ export default function GlobeGame({ run }: { run: GameRun }) {
       run.dateKey,
       summary.map((s) => s.base),
       finalTotal,
+      playUrlFromLocation(),
     )
 
     const onShare = async () => {
