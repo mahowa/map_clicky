@@ -34,4 +34,6 @@ export type GameRun = {
   timed?: boolean
   /** Show place labels on the globe (history mode: the map isn't the puzzle). */
   labeled?: boolean
+  /** Versus (#5): the challenge seed this run was dealt from. */
+  versusSeed?: string
 }
